@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Panel, Button, Badge } from '../components/StatusCard'
+import { useAppStore } from '../store/AppStore'
 
 const SPEEDS = [0.5, 1, 2, 5]
 
@@ -16,19 +17,18 @@ const INITIAL_TASKS = [
 ]
 
 export default function SimulationSandbox() {
+  const { addSimLog, simLogs } = useAppStore()
   const canvasRef = useRef(null)
   const animRef = useRef(null)
-  const [simState, setSimState] = useState('stopped') // running, paused, stopped
+  const [simState, setSimState] = useState('stopped')
   const [speed, setSpeed] = useState(1)
   const [obstacleCount, setObstacleCount] = useState(3)
   const [robots, setRobots] = useState(INITIAL_ROBOTS)
   const [tasks, setTasks] = useState(INITIAL_TASKS)
-  const [logs, setLogs] = useState([
-    { time: '00:00', msg: '仿真系统初始化完成' },
-  ])
   const [stats, setStats] = useState({ collisions: 0, avgSpeed: 0, completed: 0 })
   const obstaclesRef = useRef([])
   const frameRef = useRef(0)
+  const initialPositionsRef = useRef(INITIAL_ROBOTS.map(r => ({ id: r.id, x: r.x, y: r.y })))
 
   // Generate obstacles
   useEffect(() => {
@@ -38,11 +38,6 @@ export default function SimulationSandbox() {
     }
     obstaclesRef.current = obs
   }, [obstacleCount])
-
-  const addLog = (msg) => {
-    const t = `${String(Math.floor(frameRef.current / 60)).padStart(2, '0')}:${String(frameRef.current % 60).padStart(2, '0')}`
-    setLogs(prev => [...prev.slice(-49), { time: t, msg }])
-  }
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -75,7 +70,7 @@ export default function SimulationSandbox() {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'
       ctx.fillText(r.id, r.x, r.y + 3)
 
-      // Target
+      // Target line
       ctx.strokeStyle = r.color + '66'; ctx.lineWidth = 1; ctx.setLineDash([4, 4])
       ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.tx, r.ty); ctx.stroke()
       ctx.setLineDash([])
@@ -88,24 +83,30 @@ export default function SimulationSandbox() {
 
   const step = useCallback(() => {
     frameRef.current++
+
     setRobots(prev => prev.map(r => {
       const dx = r.tx - r.x, dy = r.ty - r.y
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist < 5) return { ...r, x: r.tx, y: r.ty }
-      const step = r.speed * speed
-      return { ...r, x: r.x + (dx / dist) * step, y: r.y + (dy / dist) * step }
+      const stepSize = r.speed * speed
+      return { ...r, x: r.x + (dx / dist) * stepSize, y: r.y + (dy / dist) * stepSize }
     }))
 
-    // Update tasks
+    // Update tasks based on robot positions
     setTasks(prev => prev.map(t => {
       const robot = robots.find(r => r.id === t.robot)
       if (!robot) return t
-      const dx = robot.tx - robot.x, dy = robot.ty - robot.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      const totalDist = Math.sqrt((robot.tx - INITIAL_ROBOTS.find(ir => ir.id === robot.id)?.x || 0) ** 2 + (robot.ty - INITIAL_ROBOTS.find(ir => ir.id === robot.id)?.y || 0) ** 2)
-      const progress = totalDist > 0 ? Math.min(100, Math.round((1 - dist / totalDist) * 100)) : 100
-      const status = progress >= 100 ? '已完成' : '进行中'
-      return { ...t, progress, status }
+      const init = initialPositionsRef.current.find(ir => ir.id === robot.id)
+      if (!init) return t
+      const totalDist = Math.sqrt((robot.tx - init.x) ** 2 + (robot.ty - init.y) ** 2)
+      const remainDist = Math.sqrt((robot.tx - robot.x) ** 2 + (robot.ty - robot.y) ** 2)
+      const progress = totalDist > 0 ? Math.min(100, Math.round((1 - remainDist / totalDist) * 100)) : 100
+      const wasComplete = t.status === '已完成'
+      const isComplete = progress >= 100
+      if (isComplete && !wasComplete) {
+        addSimLog(`任务 ${t.id} (${t.name}) 已完成`)
+      }
+      return { ...t, progress, status: isComplete ? '已完成' : progress > 0 ? '进行中' : t.status }
     }))
 
     // Update stats
@@ -114,7 +115,12 @@ export default function SimulationSandbox() {
       avgSpeed: (speed * 1.2 + Math.random() * 0.3).toFixed(1),
       completed: tasks.filter(t => t.status === '已完成').length,
     }))
-  }, [speed, robots, tasks])
+
+    // Periodic log
+    if (frameRef.current % 120 === 0) {
+      addSimLog(`仿真帧 ${frameRef.current}: ${tasks.filter(t => t.status === '已完成').length}/${tasks.length} 任务完成`)
+    }
+  }, [speed, robots, tasks, addSimLog])
 
   useEffect(() => {
     if (simState !== 'running') { cancelAnimationFrame(animRef.current); return }
@@ -127,13 +133,16 @@ export default function SimulationSandbox() {
     return () => cancelAnimationFrame(animRef.current)
   }, [simState, speed, step, draw])
 
-  const handleStart = () => { setSimState('running'); addLog('仿真启动') }
-  const handlePause = () => { setSimState('paused'); addLog('仿真暂停') }
+  const handleStart = () => {
+    setSimState('running')
+    addSimLog(`仿真启动 (速度 ${speed}x, ${obstacleCount} 障碍物)`)
+  }
+  const handlePause = () => { setSimState('paused'); addSimLog('仿真暂停') }
   const handleStop = () => {
     setSimState('stopped'); frameRef.current = 0
     setRobots(INITIAL_ROBOTS); setTasks(INITIAL_TASKS)
     setStats({ collisions: 0, avgSpeed: 0, completed: 0 })
-    addLog('仿真停止，状态重置')
+    addSimLog('仿真停止，状态重置')
   }
 
   const totalProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0
@@ -172,6 +181,9 @@ export default function SimulationSandbox() {
                 {simState === 'running' ? '运行中' : simState === 'paused' ? '已暂停' : '已停止'}
               </Badge>
             </div>
+            <div className="text-xs text-slate-500">
+              帧数: <span className="text-white font-mono">{frameRef.current}</span>
+            </div>
           </div>
         </Panel>
 
@@ -180,7 +192,7 @@ export default function SimulationSandbox() {
           <canvas ref={canvasRef} width={740} height={540} className="rounded-lg border border-slate-600 w-full" />
         </div>
 
-        {/* Stats & Logs */}
+        {/* Stats & Tasks */}
         <div className="space-y-4">
           <Panel title="仿真统计">
             <div className="space-y-3">
@@ -189,7 +201,7 @@ export default function SimulationSandbox() {
                   <span>碰撞率</span><span className="text-red-400">{stats.collisions} 次</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded h-2">
-                  <div className="bg-red-500 h-2 rounded" style={{ width: `${Math.min(stats.collisions * 10, 100)}%` }} />
+                  <div className="bg-red-500 h-2 rounded transition-all" style={{ width: `${Math.min(stats.collisions * 10, 100)}%` }} />
                 </div>
               </div>
               <div>
@@ -197,7 +209,7 @@ export default function SimulationSandbox() {
                   <span>平均速度</span><span className="text-blue-400">{stats.avgSpeed} m/s</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded h-2">
-                  <div className="bg-blue-500 h-2 rounded" style={{ width: `${Math.min(stats.avgSpeed * 20, 100)}%` }} />
+                  <div className="bg-blue-500 h-2 rounded transition-all" style={{ width: `${Math.min(stats.avgSpeed * 20, 100)}%` }} />
                 </div>
               </div>
               <div>
@@ -216,7 +228,12 @@ export default function SimulationSandbox() {
               {tasks.map(t => (
                 <div key={t.id} className="flex items-center justify-between text-xs">
                   <span className="text-slate-300">{t.name}</span>
-                  <Badge color={t.status === '已完成' ? 'green' : 'blue'}>{t.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <div className="w-12 bg-slate-700 rounded h-1.5">
+                      <div className="bg-green-500 h-1.5 rounded transition-all" style={{ width: `${t.progress}%` }} />
+                    </div>
+                    <Badge color={t.status === '已完成' ? 'green' : t.status === '进行中' ? 'blue' : 'gray'}>{t.status}</Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -225,11 +242,12 @@ export default function SimulationSandbox() {
       </div>
 
       {/* Logs */}
-      <Panel title={`仿真日志 (${logs.length})`}>
+      <Panel title={`仿真日志 (${simLogs.length})`}>
         <div className="max-h-40 overflow-y-auto space-y-1">
-          {logs.map((l, i) => (
+          {simLogs.length === 0 && <div className="text-xs text-slate-500 text-center py-4">启动仿真后将在此显示日志</div>}
+          {simLogs.map((l, i) => (
             <div key={i} className="text-xs flex gap-2">
-              <span className="text-slate-500 font-mono w-12 shrink-0">[{l.time}]</span>
+              <span className="text-slate-500 font-mono w-14 shrink-0">[{l.time}]</span>
               <span className="text-slate-300">{l.msg}</span>
             </div>
           ))}

@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
+import { AppStoreProvider } from './store/AppStore'
 import Layout from './components/Layout'
 import MapOverview from './pages/MapOverview'
 import PathPlan from './pages/PathPlan'
@@ -18,6 +19,7 @@ import SimulationSandbox from './pages/SimulationSandbox'
 
 export default function App() {
   return (
+    <AppStoreProvider>
     <HashRouter>
       <Layout>
         <Routes>
@@ -39,5 +41,6 @@ export default function App() {
         </Routes>
       </Layout>
     </HashRouter>
+    </AppStoreProvider>
   )
 }

@@ -160,16 +160,19 @@ export default function MapEditor() {
   const handleSave = () => {
     const data = { walls, doors, windows, routePoints }
     localStorage.setItem('map-editor-data', JSON.stringify(data))
-    alert('地图已保存到 localStorage')
+    setSaveMsg('💾 地图已保存到 localStorage')
+    setTimeout(() => setSaveMsg(null), 3000)
   }
 
   const handleLoad = () => {
     const raw = localStorage.getItem('map-editor-data')
-    if (!raw) { alert('没有保存的地图数据'); return }
+    if (!raw) { setSaveMsg('⚠️ 没有保存的地图数据'); setTimeout(() => setSaveMsg(null), 3000); return }
     const data = JSON.parse(raw)
     saveToHistory()
     setWalls(data.walls || []); setDoors(data.doors || []); setWindows(data.windows || []); setRoutePoints(data.routePoints || [])
-    alert('地图已加载')
+    const count = (data.walls?.length||0) + (data.doors?.length||0) + (data.windows?.length||0)
+    setSaveMsg(`📂 地图已加载 (${count} 条线段, ${data.routePoints?.length||0} 个路径点)`)
+    setTimeout(() => setSaveMsg(null), 3000)
   }
 
   const handleValidate = () => {
@@ -185,6 +188,8 @@ export default function MapEditor() {
       ? { valid: true, msg: '路径验证通过，未穿过任何墙体' }
       : { valid: false, msg: `路径有 ${crossings} 处穿过墙体` })
   }
+
+  const [saveMsg, setSaveMsg] = useState(null)
 
   const handleGenerateNavMesh = () => {
     const W = 760, H = 560, step = 60
@@ -245,7 +250,21 @@ export default function MapEditor() {
       {/* Validation result */}
       {validationResult && (
         <div className={`px-4 py-2 rounded text-sm ${validationResult.valid ? 'bg-green-900/30 text-green-400 border border-green-700' : 'bg-red-900/30 text-red-400 border border-red-700'}`}>
-          {validationResult.msg}
+          {validationResult.valid ? '✅' : '❌'} {validationResult.msg}
+        </div>
+      )}
+
+      {/* Save feedback */}
+      {saveMsg && (
+        <div className="px-4 py-2 rounded text-sm bg-blue-900/30 text-blue-400 border border-blue-700">
+          {saveMsg}
+        </div>
+      )}
+
+      {/* Nav mesh info */}
+      {navMeshGenerated && (
+        <div className="px-4 py-2 rounded text-sm bg-green-900/20 text-green-400 border border-green-800">
+          🔺 导航网格已生成: {navMeshTriangles.length} 个三角形
         </div>
       )}
     </div>
