@@ -1,185 +1,147 @@
-import { useState } from 'react'
-import { Panel, Button, Badge } from '../components/StatusCard'
+import { useState } from 'react';
 
 const RULE_TYPES = [
-  { value: 'speed_limit', label: '区域限速' },
-  { value: 'one_way', label: '单行通道' },
-  { value: 'yield', label: '路口让行' },
-  { value: 'priority', label: '特殊任务优先通道' },
-  { value: 'time_rule', label: '时间段规则' },
-  { value: 'restricted', label: '管控区域' },
-]
-
-const STATUS_LABELS = {
-  draft: { label: '草稿', color: 'gray' },
-  active: { label: '已发布', color: 'green' },
-  inactive: { label: '已停用', color: 'red' },
-}
-
-const INITIAL_RULES = [
-  { id: 'TR001', name: 'ICU走廊限速', type: 'speed_limit', area: 'ICU走廊', detail: '限速0.5m/s', status: 'active', createdAt: '2026-05-20' },
-  { id: 'TR002', name: '手术区单行道', type: 'one_way', area: '手术区走廊', detail: '仅允许从北向南通行', status: 'active', createdAt: '2026-05-20' },
-  { id: 'TR003', name: '大厅北门让行', type: 'yield', area: '主大厅北门', detail: '右侧来车优先', status: 'active', createdAt: '2026-05-21' },
-  { id: 'TR004', name: '急救任务优先通道', type: 'priority', area: '主大厅→ICU', detail: '急救任务可占用对向车道', status: 'draft', createdAt: '2026-05-22' },
-  { id: 'TR005', name: '夜间药房管控', type: 'time_rule', area: '药房入口', detail: '22:00-06:00 禁止通行', status: 'inactive', createdAt: '2026-05-23' },
-  { id: 'TR006', name: '污染区准入管控', type: 'restricted', area: '污染区走廊', detail: '需授权码+防护等级≥2', status: 'active', createdAt: '2026-05-24' },
-]
+  { id: 'speed_limit', name: '区域限速', icon: '🏃', color: 'blue' },
+  { id: 'one_way', name: '单行通道', icon: '➡️', color: 'green' },
+  { id: 'yield', name: '路口让行', icon: '⏸️', color: 'yellow' },
+  { id: 'no_entry', name: '禁行区域', icon: '🚫', color: 'red' },
+  { id: 'emergency', name: '紧急优先', icon: '🚑', color: 'purple' },
+  { id: 'time_control', name: '时间段管控', icon: '⏰', color: 'orange' },
+];
 
 export default function TrafficRules() {
-  const [rules, setRules] = useState(INITIAL_RULES)
-  const [showModal, setShowModal] = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [form, setForm] = useState({ name: '', type: 'speed_limit', area: '', detail: '' })
-  const [toast, setToast] = useState(null)
+  const [rules, setRules] = useState([
+    { id: 'R001', type: 'speed_limit', name: '药房限速', area: '药房区', value: '0.5m/s', status: 'active', created: '2024-01-15' },
+    { id: 'R002', type: 'no_entry', name: '手术区禁行', area: '手术区', value: 'R1,R3除外', status: 'active', created: '2024-01-16' },
+    { id: 'R003', type: 'emergency', name: '急诊优先', area: '急诊区', value: '优先级最高', status: 'active', created: '2024-01-17' },
+    { id: 'R004', type: 'one_way', name: '走廊单行', area: '走廊A-B', value: 'A→B方向', status: 'inactive', created: '2024-01-18' },
+  ]);
+  const [showModal, setShowModal] = useState(false);
+  const [newRule, setNewRule] = useState({ type: 'speed_limit', name: '', area: '', value: '' });
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
-
-  const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const openAdd = () => {
-    setEditId(null); setForm({ name: '', type: 'speed_limit', area: '', detail: '' }); setShowModal(true)
-  }
-
-  const openEdit = (rule) => {
-    setEditId(rule.id); setForm({ name: rule.name, type: rule.type, area: rule.area, detail: rule.detail }); setShowModal(true)
-  }
-
-  const handleSave = () => {
-    if (!form.name || !form.area || !form.detail) { alert('请填写完整信息'); return }
-    if (editId) {
-      setRules(prev => prev.map(r => r.id === editId ? { ...r, ...form } : r))
-    } else {
-      const newRule = {
-        id: `TR${String(rules.length + 1).padStart(3, '0')}`,
-        ...form, status: 'draft', createdAt: new Date().toISOString().slice(0, 10),
-      }
-      setRules(prev => [...prev, newRule])
-    }
-    setShowModal(false)
-    showToast(editId ? '✅ 规则已更新' : '✅ 规则已创建')
-  }
+  const handleAdd = () => {
+    if (!newRule.name || !newRule.area) return alert('请填写规则名称和区域');
+    setRules(prev => [...prev, {
+      id: `R${String(prev.length + 1).padStart(3, '0')}`,
+      ...newRule,
+      status: 'active',
+      created: new Date().toISOString().slice(0, 10),
+    }]);
+    setShowModal(false);
+    setNewRule({ type: 'speed_limit', name: '', area: '', value: '' });
+  };
 
   const toggleStatus = (id) => {
-    setRules(prev => prev.map(r => {
-      if (r.id !== id) return r
-      if (r.status === 'draft') { showToast('✅ 规则已发布'); return { ...r, status: 'active' } }
-      if (r.status === 'active') { showToast('⏸ 规则已停用'); return { ...r, status: 'inactive' } }
-      showToast('🔄 规则已重置为草稿')
-      return { ...r, status: 'draft' }
-    }))
-  }
+    setRules(prev => prev.map(r => r.id === id ? { ...r, status: r.status === 'active' ? 'inactive' : 'active' } : r));
+  };
 
-  const typeLabel = (type) => RULE_TYPES.find(t => t.value === type)?.label || type
+  const typeInfo = (type) => RULE_TYPES.find(t => t.id === type) || RULE_TYPES[0];
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">🚦 交通规则管理</h2>
-          <p className="text-slate-400 text-sm">管理医院内机器人交通规则，支持区域限速、单行道、让行等规则配置。</p>
-        </div>
-        <Button variant="primary" onClick={openAdd}>➕ 添加规则集</Button>
+        <h2 className="text-2xl font-bold text-slate-800">🚦 交通规则管理</h2>
+        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
+          ➕ 添加规则
+        </button>
       </div>
 
-      <Panel title={`规则集列表 (${rules.length})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-700/50">
-              <tr>
-                <th className="p-2 text-left text-slate-300">规则ID</th>
-                <th className="p-2 text-left text-slate-300">名称</th>
-                <th className="p-2 text-left text-slate-300">类型</th>
-                <th className="p-2 text-left text-slate-300">区域</th>
-                <th className="p-2 text-left text-slate-300">规则详情</th>
-                <th className="p-2 text-left text-slate-300">状态</th>
-                <th className="p-2 text-left text-slate-300">创建日期</th>
-                <th className="p-2 text-left text-slate-300">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-500">暂无交通规则，点击"添加规则集"创建</td></tr>
-              ) : rules.map(r => (
-                <tr key={r.id} className="border-t border-slate-700">
-                  <td className="p-2 text-white">{r.id}</td>
-                  <td className="p-2 text-white font-medium">{r.name}</td>
-                  <td className="p-2"><Badge color="blue">{typeLabel(r.type)}</Badge></td>
-                  <td className="p-2">{r.area}</td>
-                  <td className="p-2 text-slate-300">{r.detail}</td>
-                  <td className="p-2">
-                    <Badge color={STATUS_LABELS[r.status].color}>{STATUS_LABELS[r.status].label}</Badge>
-                  </td>
-                  <td className="p-2 text-slate-400">{r.createdAt}</td>
-                  <td className="p-2">
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="xs" onClick={() => openEdit(r)}>编辑</Button>
-                      <Button variant={r.status === 'active' ? 'danger' : 'success'} size="xs" onClick={() => toggleStatus(r.id)}>
-                        {r.status === 'draft' ? '发布' : r.status === 'active' ? '停用' : '重置'}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
-      {/* Status summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <Panel className="text-center">
-          <div className="text-2xl font-bold text-gray-400">{rules.filter(r => r.status === 'draft').length}</div>
-          <div className="text-xs text-slate-400">草稿</div>
-        </Panel>
-        <Panel className="text-center">
-          <div className="text-2xl font-bold text-green-400">{rules.filter(r => r.status === 'active').length}</div>
-          <div className="text-xs text-slate-400">已发布</div>
-        </Panel>
-        <Panel className="text-center">
-          <div className="text-2xl font-bold text-red-400">{rules.filter(r => r.status === 'inactive').length}</div>
-          <div className="text-xs text-slate-400">已停用</div>
-        </Panel>
-      </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-900/90 border border-green-500 text-green-200 px-4 py-3 rounded-lg shadow-lg text-sm animate-toast">
-          {toast}
-        </div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-[480px] border border-slate-600">
-            <h3 className="text-lg font-bold text-white mb-4">{editId ? '编辑规则' : '添加规则集'}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">规则名称</label>
-                <input value={form.name} onChange={e => update('name', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white" placeholder="如：ICU限速规则" />
+      {/* Rules Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        {rules.map(rule => {
+          const info = typeInfo(rule.type);
+          const isActive = rule.status === 'active';
+          return (
+            <div key={rule.id} className={`bg-white border-l-4 rounded-lg p-4 shadow-sm ${isActive ? `border-l-${info.color}-500` : 'border-l-slate-300 opacity-60'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{info.icon}</span>
+                  <span className="font-bold text-slate-700">{rule.name}</span>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {isActive ? '已发布' : '已停用'}
+                </span>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">规则类型</label>
-                <select value={form.type} onChange={e => update('type', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white">
-                  {RULE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+              <div className="space-y-1 text-xs text-slate-600">
+                <div>类型: {info.name}</div>
+                <div>区域: {rule.area}</div>
+                <div>参数: {rule.value}</div>
+                <div className="text-slate-400">创建: {rule.created}</div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">适用区域</label>
-                <input value={form.area} onChange={e => update('area', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white" placeholder="如：ICU走廊" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">规则详情</label>
-                <input value={form.detail} onChange={e => update('detail', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white" placeholder="如：限速0.5m/s" />
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => toggleStatus(rule.id)}
+                  className={`px-3 py-1 rounded text-xs ${isActive ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}>
+                  {isActive ? '停用' : '发布'}
+                </button>
+                <button onClick={() => setRules(prev => prev.filter(r => r.id !== rule.id))}
+                  className="px-3 py-1 rounded text-xs bg-slate-100 text-slate-500 hover:bg-slate-200">删除</button>
               </div>
             </div>
-            <div className="flex gap-2 mt-6 justify-end">
-              <Button variant="outline" onClick={() => setShowModal(false)}>取消</Button>
-              <Button variant="primary" onClick={handleSave}>{editId ? '保存修改' : '创建规则'}</Button>
+          );
+        })}
+      </div>
+
+      {/* Add Rule Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[420px] shadow-xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">添加交通规则</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">规则类型</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {RULE_TYPES.map(t => (
+                    <button key={t.id} onClick={() => setNewRule(r => ({ ...r, type: t.id }))}
+                      className={`p-2 rounded text-xs text-center border transition ${newRule.type === t.id ? `border-${t.color}-500 bg-${t.color}-50` : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className="text-lg">{t.icon}</div>
+                      <div>{t.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">规则名称</label>
+                <input value={newRule.name} onChange={e => setNewRule(r => ({ ...r, name: e.target.value }))}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 药房限速" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">适用区域</label>
+                <input value={newRule.area} onChange={e => setNewRule(r => ({ ...r, area: e.target.value }))}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 药房区" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">参数值</label>
+                <input value={newRule.value} onChange={e => setNewRule(r => ({ ...r, value: e.target.value }))}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 0.5m/s" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded text-sm bg-slate-100 hover:bg-slate-200">取消</button>
+              <button onClick={handleAdd} className="px-4 py-2 rounded text-sm bg-blue-600 text-white hover:bg-blue-700">确认添加</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">{rules.length}</div>
+          <div className="text-xs text-slate-500">总规则数</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{rules.filter(r => r.status === 'active').length}</div>
+          <div className="text-xs text-slate-500">已发布</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-slate-400">{rules.filter(r => r.status === 'inactive').length}</div>
+          <div className="text-xs text-slate-500">已停用</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-red-600">{rules.filter(r => r.type === 'no_entry').length}</div>
+          <div className="text-xs text-slate-500">禁行规则</div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

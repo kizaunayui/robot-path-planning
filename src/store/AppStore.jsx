@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-import { robots as initialRobots, collisionAlerts as initialAlerts, conflictPredictions as initialConflicts, trafficSignals as initialSignals, taskQueue as initialTasks } from '../data/mockData'
+import { createContext, useContext, useState, useCallback } from 'react';
+import { initialRobots } from '../data/mapData';
+import { collisionAlerts as initialAlerts, conflictPredictions as initialConflicts, trafficSignals as initialSignals } from '../data/mockData';
 
 const AppStoreContext = createContext(null)
 
@@ -13,15 +14,14 @@ export function AppStoreProvider({ children }) {
 
   // === Tasks (active task queue) ===
   const [activeTasks, setActiveTasks] = useState([
-    { id: 'AT001', from: '药房', to: 'ICU', cargo: '急救药品', path: 'A', robot: 'R001', status: '执行中', progress: 65 },
-    { id: 'AT002', from: '住院部', to: '检验科', cargo: '血液样本', path: 'B', robot: 'R002', status: '执行中', progress: 30 },
+    { id: 'AT001', from: '药房', to: 'ICU', cargo: '急救药品', path: '最优路径A', robot: 'R1', status: '执行中', progress: 65 },
+    { id: 'AT002', from: '住院部', to: '检验科', cargo: '血液样本', path: '备用路径B', robot: 'R2', status: '执行中', progress: 30 },
   ])
 
   const dispatchTask = useCallback((task) => {
     setActiveTasks(prev => [...prev, task])
-    // Update robot status
     if (task.robot) {
-      setRobots(prev => prev.map(r => r.id === task.robot ? { ...r, status: 'running' } : r))
+      setRobots(prev => prev.map(r => r.id === task.robot ? { ...r, status: 'running', taskId: task.id } : r))
     }
   }, [])
 
