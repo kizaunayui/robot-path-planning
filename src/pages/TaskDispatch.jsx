@@ -61,6 +61,19 @@ export default function TaskDispatch() {
 
   const availableRobots = robots.filter(r => r.status !== 'charging' && r.status !== 'error')
 
+  const handleExportCSV = () => {
+    if (activeTasks.length === 0) { alert('暂无任务数据可导出'); return }
+    const headers = ['任务ID', '起点', '终点', '货物', '路径', '机器人', '状态', '进度']
+    const rows = activeTasks.map(t => [t.id, t.from, t.to, t.cargo, t.path, t.robot, t.status, `${t.progress}%`])
+    const csv = '\uFEFF' + [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `任务列表_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    addDispatchLog('已导出任务列表CSV')
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold">📦 任务即时派发</h2>
@@ -153,7 +166,7 @@ export default function TaskDispatch() {
                       <option key={r.id} value={r.id}>{r.name} ({r.id}) - 🔋{r.battery}%</option>
                     ))}
                   </select>
-                  <Button variant="success" onClick={handleDispatch} className="w-full mt-3">🚀 派发任务</Button>
+                  <Button variant="success" onClick={handleDispatch} disabled={!selectedPath || !selectedRobot} className="w-full mt-3">🚀 派发任务</Button>
                 </div>
               )}
             </div>
@@ -162,7 +175,7 @@ export default function TaskDispatch() {
       </div>
 
       {/* Active tasks */}
-      <Panel title={`活跃任务队列 (${activeTasks.length})`}>
+      <Panel title={`活跃任务队列 (${activeTasks.length})`} actions={activeTasks.length > 0 ? <Button variant="outline" size="xs" onClick={handleExportCSV}>📥 导出CSV</Button> : null}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-700/50">
@@ -178,7 +191,9 @@ export default function TaskDispatch() {
               </tr>
             </thead>
             <tbody>
-              {activeTasks.map(t => (
+              {activeTasks.length === 0 ? (
+                <tr><td colSpan={8} className="p-8 text-center text-slate-500">暂无活跃任务，请派发新任务</td></tr>
+              ) : activeTasks.map(t => (
                 <tr key={t.id} className="border-t border-slate-700">
                   <td className="p-2 text-white">{t.id}</td>
                   <td className="p-2">{t.from}</td>

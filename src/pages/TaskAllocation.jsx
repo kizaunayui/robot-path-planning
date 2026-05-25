@@ -45,7 +45,9 @@ export default function TaskAllocation() {
             }
           >
             <div className="space-y-1.5">
-              {taskList.map((task, idx) => (
+              {taskList.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">暂无待分配任务</div>
+              ) : taskList.map((task, idx) => (
                 <div
                   key={task.id}
                   draggable

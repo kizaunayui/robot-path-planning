@@ -54,3 +54,25 @@ body {
 .glow-red { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
 .glow-blue { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4); }
 .glow-yellow { box-shadow: 0 0 12px rgba(234, 179, 8, 0.4); }
+
+/* Table cell overflow */
+table th, table td {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table th {
+  white-space: nowrap;
+}
+
+/* Toast animation */
+@keyframes toast-in {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-toast {
+  animation: toast-in 0.3s ease-out;
+}

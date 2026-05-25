@@ -30,6 +30,9 @@ export default function TrafficRules() {
   const [showModal, setShowModal] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState({ name: '', type: 'speed_limit', area: '', detail: '' })
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500) }
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -53,13 +56,15 @@ export default function TrafficRules() {
       setRules(prev => [...prev, newRule])
     }
     setShowModal(false)
+    showToast(editId ? '✅ 规则已更新' : '✅ 规则已创建')
   }
 
   const toggleStatus = (id) => {
     setRules(prev => prev.map(r => {
       if (r.id !== id) return r
-      if (r.status === 'draft') return { ...r, status: 'active' }
-      if (r.status === 'active') return { ...r, status: 'inactive' }
+      if (r.status === 'draft') { showToast('✅ 规则已发布'); return { ...r, status: 'active' } }
+      if (r.status === 'active') { showToast('⏸ 规则已停用'); return { ...r, status: 'inactive' } }
+      showToast('🔄 规则已重置为草稿')
       return { ...r, status: 'draft' }
     }))
   }
@@ -92,7 +97,9 @@ export default function TrafficRules() {
               </tr>
             </thead>
             <tbody>
-              {rules.map(r => (
+              {rules.length === 0 ? (
+                <tr><td colSpan={8} className="p-8 text-center text-slate-500">暂无交通规则，点击"添加规则集"创建</td></tr>
+              ) : rules.map(r => (
                 <tr key={r.id} className="border-t border-slate-700">
                   <td className="p-2 text-white">{r.id}</td>
                   <td className="p-2 text-white font-medium">{r.name}</td>
@@ -133,6 +140,13 @@ export default function TrafficRules() {
           <div className="text-xs text-slate-400">已停用</div>
         </Panel>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-green-900/90 border border-green-500 text-green-200 px-4 py-3 rounded-lg shadow-lg text-sm animate-toast">
+          {toast}
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (

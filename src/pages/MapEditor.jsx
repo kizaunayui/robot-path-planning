@@ -17,6 +17,7 @@ export default function MapEditor() {
   const [navMeshGenerated, setNavMeshGenerated] = useState(false)
   const [navMeshTriangles, setNavMeshTriangles] = useState([])
   const [validationResult, setValidationResult] = useState(null)
+  const [saveMsg, setSaveMsg] = useState(null)
 
   const saveToHistory = useCallback(() => {
     setHistory(h => [...h, { walls: [...walls], doors: [...doors], windows: [...windows], routePoints: [...routePoints] }])
@@ -158,9 +159,11 @@ export default function MapEditor() {
   }
 
   const handleSave = () => {
+    const total = walls.length + doors.length + windows.length + routePoints.length
+    if (total === 0) { setSaveMsg('⚠️ 画布为空，无需保存'); setTimeout(() => setSaveMsg(null), 3000); return }
     const data = { walls, doors, windows, routePoints }
     localStorage.setItem('map-editor-data', JSON.stringify(data))
-    setSaveMsg('💾 地图已保存到 localStorage')
+    setSaveMsg(`💾 地图已保存 (${walls.length}墙, ${doors.length}门, ${windows.length}窗, ${routePoints.length}路径点)`)
     setTimeout(() => setSaveMsg(null), 3000)
   }
 
@@ -189,7 +192,6 @@ export default function MapEditor() {
       : { valid: false, msg: `路径有 ${crossings} 处穿过墙体` })
   }
 
-  const [saveMsg, setSaveMsg] = useState(null)
 
   const handleGenerateNavMesh = () => {
     const W = 760, H = 560, step = 60
@@ -202,6 +204,8 @@ export default function MapEditor() {
     }
     setNavMeshTriangles(tris)
     setNavMeshGenerated(true)
+    setSaveMsg(`🔺 导航网格已生成: ${tris.length} 个三角形`)
+    setTimeout(() => setSaveMsg(null), 3000)
   }
 
   const toolLabels = { wall: '墙体', door: '门', window: '窗户', route: '路线' }
