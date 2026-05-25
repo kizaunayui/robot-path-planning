@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import MapOverview from './pages/MapOverview'
 import PathPlan from './pages/PathPlan'
@@ -13,7 +13,7 @@ import Diagnostics from './pages/Diagnostics'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Layout>
         <Routes>
           <Route path="/" element={<MapOverview />} />
@@ -28,6 +28,6 @@ export default function App() {
           <Route path="/diagnostics" element={<Diagnostics />} />
         </Routes>
       </Layout>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
