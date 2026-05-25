@@ -49,7 +49,8 @@ export default function Diagnostics() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">📍 定位与诊断</h2>
+      <h2 className="text-xl font-bold text-white">📍 诊断</h2>
+      <p className="text-slate-400 text-sm">UWB 定位监控与系统诊断日志，实时显示定位置信度和传感器状态。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="UWB基站" value={uwbStations.length} subtitle="定位基础设施" icon="📡" color="blue" />

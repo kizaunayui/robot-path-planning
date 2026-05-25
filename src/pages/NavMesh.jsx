@@ -18,7 +18,8 @@ export default function NavMesh() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">🔺 导航网格 (NavMesh)</h2>
+      <h2 className="text-xl font-bold text-white">🔺 导航网格</h2>
+      <p className="text-slate-400 text-sm">基于 Delaunay 三角剖分构建导航网格，支持路径可行性仿真和冲突检测。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="三角形数" value={navMeshTriangles.length} subtitle="网格单元" icon="🔺" color="blue" />

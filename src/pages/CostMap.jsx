@@ -37,7 +37,8 @@ export default function CostMap() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">🌡️ 语义区域代价映射</h2>
+      <h2 className="text-xl font-bold text-white">🌡️ 区域代价</h2>
+      <p className="text-slate-400 text-sm">基于语义区域的代价映射与策略配置，支持热力图实时渲染和通行策略调整。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="区域数" value={configs.length} subtitle="语义区域" icon="🗺️" color="blue" />

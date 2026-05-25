@@ -9,7 +9,7 @@ export default function MapOverview() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">🗺️ 医院地图总览</h2>
+      <h2 className="text-xl font-bold">🗺️ 地图总览</h2>
       <p className="text-slate-400 text-sm">
         基于 hospital_map_semantic_modeling 构建的语义地图。悬停节点查看区域类型和代价信息。
         包含 {Object.keys(AREA_TYPES).length} 种区域类型、25个关键节点、48条可通行边。

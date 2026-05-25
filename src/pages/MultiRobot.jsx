@@ -72,7 +72,8 @@ export default function MultiRobot() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">🤖 多机器人协调</h2>
+      <h2 className="text-xl font-bold text-white">🤖 多机器人</h2>
+      <p className="text-slate-400 text-sm">多机器人实时协调，支持冲突预测、死锁检测、交通信号控制和时空图可视化。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="运行机器人" value={activeCount} subtitle="正在移动" icon="🤖" color="blue" />

@@ -75,7 +75,8 @@ export default function Collision() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">⚠️ 碰撞预测与避障</h2>
+      <h2 className="text-xl font-bold text-white">⚠️ 碰撞预警</h2>
+      <p className="text-slate-400 text-sm">实时监测机器人间碰撞风险，支持 DWA 局部避障和碰撞锥可视化，预警自动弹窗提醒。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="预警总数" value={stats.total} subtitle="累计告警" icon="⚠️" color="red" />

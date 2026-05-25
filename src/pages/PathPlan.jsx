@@ -117,6 +117,7 @@ export default function PathPlan() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-white">📐 路径规划</h2>
+      <p className="text-slate-400 text-sm">支持 A*/RRT*/混合算法三种路径规划，点击地图设置起终点，实时对比不同算法的路径效果。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="支持算法" value="3" subtitle="A*/RRT*/混合" icon="🧮" color="blue" />

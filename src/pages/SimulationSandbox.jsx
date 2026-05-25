@@ -149,7 +149,7 @@ export default function SimulationSandbox() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">🎮 模拟沙盒演练</h2>
+      <h2 className="text-xl font-bold">🎮 模拟沙盒</h2>
       <p className="text-slate-400 text-sm">在虚拟环境中仿真机器人运动、障碍物规避和任务执行，观察统计数据。</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">

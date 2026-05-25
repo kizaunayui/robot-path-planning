@@ -46,7 +46,8 @@ export default function Charging() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">🔋 充电调度</h2>
+      <h2 className="text-xl font-bold text-white">🔋 充电管理</h2>
+      <p className="text-slate-400 text-sm">机器人电量监控与充电桩调度，支持智能充电建议和电量仪表可视化。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="平均电量" value={`${avgBattery}%`} subtitle="全机平均" icon="🔋" color="blue" />

@@ -17,7 +17,8 @@ export default function HISPolicy() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">⚙️ HIS动态策略 & 货物风险</h2>
+      <h2 className="text-xl font-bold text-white">⚙️ HIS策略</h2>
+      <p className="text-slate-400 text-sm">HIS 动态策略配置与货物风险评估，支持策略启停和风险等级可视化。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="活跃策略" value={activeCount} subtitle={`共${policies.length}条`} icon="⚙️" color="blue" />

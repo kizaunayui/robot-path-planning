@@ -213,8 +213,8 @@ export default function MapEditor() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">🗺️ 地图实时编辑</h2>
-      <p className="text-slate-400 text-sm">在画布上绘制墙体、门、窗户和路线，支持保存/加载和路径验证。</p>
+      <h2 className="text-xl font-bold">🗺️ 地图编辑</h2>
+      <p className="text-slate-400 text-sm">在画布上绘制墙体、门、窗户和路线，支持保存/加载、路径验证和导航网格生成。</p>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">

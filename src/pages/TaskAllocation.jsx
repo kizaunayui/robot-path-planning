@@ -27,6 +27,7 @@ export default function TaskAllocation() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-white">📋 任务分配</h2>
+      <p className="text-slate-400 text-sm">基于匈牙利算法的任务分配优化，支持拖拽排序和自动匹配最优机器人。</p>
 
       <div className="grid grid-cols-4 gap-3">
         <StatusCard title="待分配任务" value={taskList.length} subtitle="任务队列" icon="📋" color="blue" />
