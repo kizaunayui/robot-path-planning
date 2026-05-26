@@ -1,324 +1,263 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { mapNodes, mapEdges, mapAreas, nodeTypeColors, nodeTypeNames } from '../data/mapData';
+import { useRef, useEffect, useState, useCallback } from "react";
+import { pointColors, pointIcons, strategyColors } from "../data/mapData";
 
-export default function HospitalMap({ floor, robots = [], selectedRoute = null, onNodeClick, onRobotClick }) {
+/**
+ * 网格地图渲染组件
+ * 支持：墙壁、动态障碍、科室标记、路径高亮、机器人位置
+ */
+export default function HospitalMap({
+  mapData,
+  routes = [],
+  bestRoute = null,
+  highlightRoute = null,
+  robots = [],
+  showGrid = true,
+  showLabels = true,
+  showVisited = false,
+  onCellClick,
+  editMode = null,
+  className = "",
+}) {
   const canvasRef = useRef(null);
-  const animRef = useRef(null);
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [animBallPos, setAnimBallPos] = useState(0);
+  const [hoveredCell, setHoveredCell] = useState(null);
 
-  // Filter data by floor
-  const floorNodes = mapNodes.filter(n => n.floor === floor);
-  const floorEdges = mapEdges.filter(e => e.floor === floor);
-  const floorAreas = mapAreas.filter(a => a.floor === floor);
-  const floorRobots = robots.filter(r => r.floor === floor);
+  const { cols, rows, walls, dynamic, points } = mapData;
 
-  // Get node position by id
-  const nodeMap = new Map(mapNodes.map(n => [n.id, n]));
+  // Cell size
+  const CELL = 28;
+  const W = cols * CELL;
+  const H = rows * CELL;
 
-  // Animation for path ball
-  useEffect(() => {
-    if (!selectedRoute?.path?.length || selectedRoute.path.length < 2) return;
-    let progress = 0;
-    const animate = () => {
-      progress += 0.005;
-      if (progress > 1) progress = 0;
-      setAnimBallPos(progress);
-      animRef.current = requestAnimationFrame(animate);
-    };
-    animRef.current = requestAnimationFrame(animate);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [selectedRoute]);
+  // Build wall/dynamic sets for fast lookup
+  const wallSet = new Set(walls.map((p) => `${p[0]},${p[1]}`));
+  const dynamicSet = new Set(dynamic.map((p) => `${p[0]},${p[1]}`));
 
-  // Draw canvas
+  // Draw
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const W = 1200, H = 800;
+    const ctx = canvas.getContext("2d");
     canvas.width = W;
     canvas.height = H;
 
-    // Clear
-    ctx.fillStyle = '#f8fafc';
+    // Background
+    ctx.fillStyle = "#f8fafc";
     ctx.fillRect(0, 0, W, H);
 
     // Grid
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 0.5;
-    for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-    // Draw areas
-    floorAreas.forEach(a => {
-      ctx.fillStyle = a.color || '#e3f2fd';
-      ctx.globalAlpha = 0.4;
-      ctx.fillRect(a.x, a.y, a.w, a.h);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = '#90a4ae';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(a.x, a.y, a.w, a.h);
-      // Label
-      ctx.fillStyle = '#546e7a';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(a.name, a.x + a.w / 2, a.y + 18);
-    });
-
-    // Draw edges
-    floorEdges.forEach(e => {
-      const fromNode = nodeMap.get(e.from);
-      const toNode = nodeMap.get(e.to);
-      if (!fromNode || !toNode) return;
-      ctx.strokeStyle = e.isElevator ? '#9c27b0' : '#b0bec5';
-      ctx.lineWidth = e.isElevator ? 3 : 2;
-      if (e.isElevator) ctx.setLineDash([6, 4]);
-      else ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(fromNode.x, fromNode.y);
-      ctx.lineTo(toNode.x, toNode.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Distance label
-      const mx = (fromNode.x + toNode.x) / 2;
-      const my = (fromNode.y + toNode.y) / 2;
-      ctx.fillStyle = '#78909c';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${e.distance}m`, mx, my - 6);
-    });
-
-    // Draw selected route paths
-    const routeColors = { '最优路径A': '#4caf50', '备用路径B': '#ff9800', '应急路径C': '#f44336' };
-    if (selectedRoute?.path?.length > 1) {
-      const color = routeColors[selectedRoute.label] || '#4caf50';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 4;
-      ctx.setLineDash([8, 6]);
-      ctx.globalAlpha = 0.8;
-      ctx.beginPath();
-      for (let i = 0; i < selectedRoute.path.length; i++) {
-        const nd = nodeMap.get(selectedRoute.path[i]);
-        if (!nd) continue;
-        if (i === 0) ctx.moveTo(nd.x, nd.y);
-        else ctx.lineTo(nd.x, nd.y);
+    if (showGrid) {
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= cols; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * CELL, 0);
+        ctx.lineTo(x * CELL, H);
+        ctx.stroke();
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-
-      // Animated ball
-      if (selectedRoute.path.length >= 2) {
-        const idx = Math.floor(animBallPos * (selectedRoute.path.length - 1));
-        const frac = (animBallPos * (selectedRoute.path.length - 1)) - idx;
-        const n1 = nodeMap.get(selectedRoute.path[idx]);
-        const n2 = nodeMap.get(selectedRoute.path[Math.min(idx + 1, selectedRoute.path.length - 1)]);
-        if (n1 && n2) {
-          const bx = n1.x + (n2.x - n1.x) * frac;
-          const by = n1.y + (n2.y - n1.y) * frac;
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(bx, by, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+      for (let y = 0; y <= rows; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * CELL);
+        ctx.lineTo(W, y * CELL);
+        ctx.stroke();
       }
     }
 
-    // Draw nodes
-    floorNodes.forEach(n => {
-      const color = nodeTypeColors[n.type] || '#9e9e9e';
-      const isHovered = hoveredNode === n.id;
-      const radius = isHovered ? 16 : 12;
+    // Walls
+    for (const [wx, wy] of walls) {
+      ctx.fillStyle = "#37474f";
+      ctx.fillRect(wx * CELL, wy * CELL, CELL, CELL);
+    }
 
-      // Shadow
-      ctx.shadowColor = 'rgba(0,0,0,0.15)';
-      ctx.shadowBlur = 4;
-      ctx.fillStyle = color;
+    // Dynamic obstacles
+    for (const [dx, dy] of dynamic) {
+      ctx.fillStyle = "#ff9800";
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(dx * CELL, dy * CELL, CELL, CELL);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#e65100";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dx * CELL + 1, dy * CELL + 1, CELL - 2, CELL - 2);
+      // ⚠ icon
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(CELL * 0.5)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("⚠", dx * CELL + CELL / 2, dy * CELL + CELL / 2);
+    }
+
+    // Visited cells (if enabled)
+    if (showVisited && highlightRoute?.visited) {
+      ctx.fillStyle = "#bbdefb";
+      ctx.globalAlpha = 0.3;
+      for (const [vx, vy] of highlightRoute.visited) {
+        ctx.fillRect(vx * CELL, vy * CELL, CELL, CELL);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Route paths
+    const allRoutes = routes.filter((r) => r.reachable);
+    for (const route of allRoutes) {
+      const isActive = highlightRoute && route.strategy === highlightRoute.strategy;
+      const color = strategyColors[route.strategy] || "#4caf50";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isActive ? 4 : 2;
+      ctx.globalAlpha = isActive ? 0.9 : 0.3;
+      ctx.setLineDash(isActive ? [] : [6, 4]);
       ctx.beginPath();
-      ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+      for (let i = 0; i < route.path.length; i++) {
+        const [px, py] = route.path[i];
+        const cx = px * CELL + CELL / 2;
+        const cy = py * CELL + CELL / 2;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
+    // Points (departments)
+    for (const [name, [px, py]] of Object.entries(points)) {
+      const color = pointColors[name] || "#607d8b";
+      const icon = pointIcons[name] || "📍";
+
+      // Circle
+      ctx.fillStyle = color;
+      ctx.shadowColor = "rgba(0,0,0,0.2)";
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      ctx.arc(px * CELL + CELL / 2, py * CELL + CELL / 2, CELL * 0.42, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
 
       // Border
-      ctx.strokeStyle = isHovered ? '#fff' : '#37474f';
-      ctx.lineWidth = isHovered ? 3 : 1.5;
-      ctx.stroke();
-
-      // Icon text
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const iconMap = {
-        pharmacy: '药', nurse_station: '护', ward: '病', lab: '检',
-        operating_room: '术', elevator: '梯', charging_station: '充',
-        storage: '库', outpatient: '门', emergency: '急',
-        transfer_point: '交', corridor_intersection: '●',
-      };
-      ctx.fillText(iconMap[n.type] || '●', n.x, n.y);
-
-      // Name label
-      ctx.fillStyle = '#263238';
-      ctx.font = '11px sans-serif';
-      ctx.textBaseline = 'top';
-      ctx.fillText(n.name, n.x, n.y + radius + 4);
-    });
-
-    // Draw robots
-    floorRobots.forEach(r => {
-      // Blue circle
-      ctx.fillStyle = r.status === 'charging' ? '#ffc107' : r.status === 'running' ? '#2196f3' : '#42a5f5';
-      ctx.beginPath();
-      ctx.arc(r.x, r.y, 14, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Robot ID
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(r.id, r.x, r.y);
+      // Icon
+      if (showLabels) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `${Math.floor(CELL * 0.4)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(icon, px * CELL + CELL / 2, py * CELL + CELL / 2);
 
-      // Battery bar
-      const bw = 24, bh = 4;
-      const bx = r.x - bw / 2, by = r.y + 18;
-      ctx.fillStyle = '#e0e0e0';
-      ctx.fillRect(bx, by, bw, bh);
-      const batColor = r.battery > 60 ? '#4caf50' : r.battery > 30 ? '#ff9800' : '#f44336';
-      ctx.fillStyle = batColor;
-      ctx.fillRect(bx, by, bw * (r.battery / 100), bh);
+        // Name label
+        ctx.fillStyle = "#263238";
+        ctx.font = `bold ${Math.floor(CELL * 0.35)}px sans-serif`;
+        ctx.textBaseline = "top";
+        ctx.fillText(name, px * CELL + CELL / 2, py * CELL + CELL + 2);
+      }
+    }
 
-      // Name
-      ctx.fillStyle = '#1565c0';
-      ctx.font = '10px sans-serif';
-      ctx.textBaseline = 'top';
-      ctx.fillText(r.name, r.x, by + 8);
-    });
+    // Robots
+    for (const r of robots) {
+      const [rx, ry] = r.pos;
+      const color = r.status === "charging" ? "#ffc107" : r.status === "running" ? "#2196f3" : "#42a5f5";
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(rx * CELL + CELL / 2, ry * CELL + CELL / 2, CELL * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(CELL * 0.32)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(r.id, rx * CELL + CELL / 2, ry * CELL + CELL / 2);
+    }
 
-  }, [floor, floorNodes, floorEdges, floorAreas, floorRobots, hoveredNode, selectedRoute, animBallPos]);
+    // Hovered cell highlight
+    if (hoveredCell && editMode) {
+      const [hx, hy] = hoveredCell;
+      ctx.strokeStyle = "#2196f3";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(hx * CELL + 1, hy * CELL + 1, CELL - 2, CELL - 2);
+      ctx.setLineDash([]);
+    }
+
+    // Start/End markers on highlighted route
+    if (highlightRoute?.path?.length > 1) {
+      const start = highlightRoute.path[0];
+      const end = highlightRoute.path[highlightRoute.path.length - 1];
+
+      // Start marker (green)
+      ctx.fillStyle = "#4caf50";
+      ctx.beginPath();
+      ctx.arc(start[0] * CELL + CELL / 2, start[1] * CELL + CELL / 2, CELL * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(CELL * 0.4)}px sans-serif`;
+      ctx.fillText("S", start[0] * CELL + CELL / 2, start[1] * CELL + CELL / 2);
+
+      // End marker (red)
+      ctx.fillStyle = "#f44336";
+      ctx.beginPath();
+      ctx.arc(end[0] * CELL + CELL / 2, end[1] * CELL + CELL / 2, CELL * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.fillText("E", end[0] * CELL + CELL / 2, end[1] * CELL + CELL / 2);
+    }
+  }, [mapData, routes, highlightRoute, robots, showGrid, showLabels, showVisited, hoveredCell, editMode, W, H, CELL, cols, rows, wallSet, dynamicSet]);
 
   // Mouse interaction
-  const handleClick = useCallback((e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = 1200 / rect.width;
-    const scaleY = 800 / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+  const getCell = useCallback(
+    (e) => {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      const scaleY = H / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+      const cx = Math.floor(mx / CELL);
+      const cy = Math.floor(my / CELL);
+      if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) return [cx, cy];
+      return null;
+    },
+    [W, H, CELL, cols, rows]
+  );
 
-    // Check robots first
-    for (const r of floorRobots) {
-      if (Math.hypot(mx - r.x, my - r.y) < 18) {
-        setSelectedItem({ type: 'robot', data: r });
-        onRobotClick?.(r);
-        return;
-      }
-    }
-    // Check nodes
-    for (const n of floorNodes) {
-      if (Math.hypot(mx - n.x, my - n.y) < 16) {
-        setSelectedItem({ type: 'node', data: n });
-        onNodeClick?.(n);
-        return;
-      }
-    }
-    setSelectedItem(null);
-  }, [floorNodes, floorRobots, onNodeClick, onRobotClick]);
+  const handleClick = useCallback(
+    (e) => {
+      const cell = getCell(e);
+      if (cell && onCellClick) onCellClick(cell);
+    },
+    [getCell, onCellClick]
+  );
 
-  const handleMouseMove = useCallback((e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = 1200 / rect.width;
-    const scaleY = 800 / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-
-    for (const n of floorNodes) {
-      if (Math.hypot(mx - n.x, my - n.y) < 16) {
-        setHoveredNode(n.id);
-        canvas.style.cursor = 'pointer';
-        return;
+  const handleMouseMove = useCallback(
+    (e) => {
+      const cell = getCell(e);
+      setHoveredCell(cell);
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.style.cursor = editMode ? "crosshair" : cell ? "pointer" : "default";
       }
-    }
-    for (const r of floorRobots) {
-      if (Math.hypot(mx - r.x, my - r.y) < 18) {
-        setHoveredNode(null);
-        canvas.style.cursor = 'pointer';
-        return;
-      }
-    }
-    setHoveredNode(null);
-    canvas.style.cursor = 'default';
-  }, [floorNodes, floorRobots]);
+    },
+    [getCell, editMode]
+  );
 
   return (
-    <div className="flex gap-4">
-      <div className="flex-1">
-        <canvas
-          ref={canvasRef}
-          onClick={handleClick}
-          onMouseMove={handleMouseMove}
-          className="w-full border border-slate-300 rounded-lg shadow-lg bg-white"
-          style={{ maxHeight: '600px', aspectRatio: '3/2' }}
-        />
-        {/* Legend */}
-        <div className="mt-3 flex flex-wrap gap-3 text-xs">
-          {Object.entries(nodeTypeNames).map(([type, name]) => (
-            <div key={type} className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: nodeTypeColors[type] }} />
-              <span className="text-slate-600">{name}</span>
-            </div>
-          ))}
+    <div className={className}>
+      <canvas
+        ref={canvasRef}
+        onClick={handleClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredCell(null)}
+        className="w-full border border-slate-300 rounded-lg shadow bg-white"
+        style={{ maxHeight: "520px", aspectRatio: `${W}/${H}` }}
+      />
+      {hoveredCell && (
+        <div className="mt-1 text-xs text-slate-500">
+          坐标: ({hoveredCell[0]}, {hoveredCell[1]})
+          {wallSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && " | 墙壁"}
+          {dynamicSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && " | 动态障碍"}
         </div>
-      </div>
-
-      {/* Info Panel */}
-      <div className="w-[260px] bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-3 border-b pb-2">📋 信息面板</h3>
-        {selectedItem ? (
-          <div className="space-y-2 text-xs">
-            {selectedItem.type === 'robot' ? (
-              <>
-                <div className="text-blue-600 font-bold text-sm">🤖 {selectedItem.data.name}</div>
-                <div><span className="text-slate-500">ID:</span> {selectedItem.data.id}</div>
-                <div><span className="text-slate-500">楼层:</span> {selectedItem.data.floor}</div>
-                <div><span className="text-slate-500">状态:</span> <span className={selectedItem.data.status === 'idle' ? 'text-green-600' : selectedItem.data.status === 'charging' ? 'text-yellow-600' : 'text-blue-600'}>{selectedItem.data.status}</span></div>
-                <div><span className="text-slate-500">电量:</span> {selectedItem.data.battery}%</div>
-                <div><span className="text-slate-500">速度:</span> {selectedItem.data.speed}m/s</div>
-              </>
-            ) : (
-              <>
-                <div className="text-purple-600 font-bold text-sm">{nodeTypeNames[selectedItem.data.type] || '节点'} {selectedItem.data.name}</div>
-                <div><span className="text-slate-500">ID:</span> {selectedItem.data.id}</div>
-                <div><span className="text-slate-500">类型:</span> {nodeTypeNames[selectedItem.data.type]}</div>
-                <div><span className="text-slate-500">坐标:</span> ({selectedItem.data.x}, {selectedItem.data.y})</div>
-                {selectedItem.data.description && <div><span className="text-slate-500">描述:</span> {selectedItem.data.description}</div>}
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="text-slate-400 text-xs">点击节点或机器人查看详情</div>
-        )}
-
-        {/* Route Info */}
-        {selectedRoute?.reachable && (
-          <div className="mt-4 pt-3 border-t space-y-1 text-xs">
-            <div className="text-green-600 font-bold text-sm">🛤️ {selectedRoute.label}</div>
-            <div><span className="text-slate-500">距离:</span> {selectedRoute.distance}m</div>
-            <div><span className="text-slate-500">时间:</span> {selectedRoute.time}分钟</div>
-            <div><span className="text-slate-500">电量:</span> {selectedRoute.energy}%</div>
-            <div><span className="text-slate-500">风险:</span> <span className={selectedRoute.risk === 'high' ? 'text-red-600' : selectedRoute.risk === 'medium' ? 'text-yellow-600' : 'text-green-600'}>{selectedRoute.risk}</span></div>
-            <div className="text-slate-500">路径: {selectedRoute.path.join(' → ')}</div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

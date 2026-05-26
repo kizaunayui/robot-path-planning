@@ -1,84 +1,199 @@
-import { useState } from 'react';
+import { useState } from "react";
+import { useAppStore } from "../store/AppStore";
 
-const RULE_TYPES = [
-  { id: 'speed_limit', name: '区域限速', icon: '🏃', color: 'blue' },
-  { id: 'one_way', name: '单行通道', icon: '➡️', color: 'green' },
-  { id: 'yield', name: '路口让行', icon: '⏸️', color: 'yellow' },
-  { id: 'no_entry', name: '禁行区域', icon: '🚫', color: 'red' },
-  { id: 'emergency', name: '紧急优先', icon: '🚑', color: 'purple' },
-  { id: 'time_control', name: '时间段管控', icon: '⏰', color: 'orange' },
-];
+const RULE_TYPE_INFO = {
+  priority_zone: { icon: "🏥", name: "优先通行区", color: "green" },
+  avoid_zone: { icon: "🚫", name: "避让区域", color: "red" },
+  smooth: { icon: "🛤️", name: "平稳优先", color: "yellow" },
+  energy: { icon: "⚡", name: "节能模式", color: "blue" },
+};
 
 export default function TrafficRules() {
-  const [rules, setRules] = useState([
-    { id: 'R001', type: 'speed_limit', name: '药房限速', area: '药房区', value: '0.5m/s', status: 'active', created: '2024-01-15' },
-    { id: 'R002', type: 'no_entry', name: '手术区禁行', area: '手术区', value: 'R1,R3除外', status: 'active', created: '2024-01-16' },
-    { id: 'R003', type: 'emergency', name: '急诊优先', area: '急诊区', value: '优先级最高', status: 'active', created: '2024-01-17' },
-    { id: 'R004', type: 'one_way', name: '走廊单行', area: '走廊A-B', value: 'A→B方向', status: 'inactive', created: '2024-01-18' },
-  ]);
+  const { rules, params, updateRules, updateParams, planRoutes, routes, addLog } = useAppStore();
   const [showModal, setShowModal] = useState(false);
-  const [newRule, setNewRule] = useState({ type: 'speed_limit', name: '', area: '', value: '' });
+  const [newRule, setNewRule] = useState({ id: "", name: "", type: "priority_zone", weight: 1.5, enabled: true });
+
+  const handleToggle = (id) => {
+    const updated = rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r));
+    updateRules(updated);
+  };
+
+  const handleDelete = (id) => {
+    const updated = rules.filter((r) => r.id !== id);
+    updateRules(updated);
+  };
 
   const handleAdd = () => {
-    if (!newRule.name || !newRule.area) return alert('请填写规则名称和区域');
-    setRules(prev => [...prev, {
-      id: `R${String(prev.length + 1).padStart(3, '0')}`,
+    if (!newRule.name) return;
+    const rule = {
       ...newRule,
-      status: 'active',
-      created: new Date().toISOString().slice(0, 10),
-    }]);
+      id: `R${Date.now()}`,
+    };
+    updateRules([...rules, rule]);
     setShowModal(false);
-    setNewRule({ type: 'speed_limit', name: '', area: '', value: '' });
+    setNewRule({ id: "", name: "", type: "priority_zone", weight: 1.5, enabled: true });
   };
 
-  const toggleStatus = (id) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, status: r.status === 'active' ? 'inactive' : 'active' } : r));
+  const handleWeightChange = (id, weight) => {
+    const updated = rules.map((r) => (r.id === id ? { ...r, weight: Number(weight) } : r));
+    updateRules(updated);
   };
 
-  const typeInfo = (type) => RULE_TYPES.find(t => t.id === type) || RULE_TYPES[0];
+  const handleReplan = () => {
+    const result = planRoutes();
+    addLog("规则变更已触发路径重规划");
+  };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-800">🚦 交通规则管理</h2>
-        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
-          ➕ 添加规则
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleReplan}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
+          >
+            🔄 重规划路径
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            ➕ 添加规则
+          </button>
+        </div>
       </div>
 
-      {/* Rules Grid */}
+      {/* Rules */}
       <div className="grid grid-cols-2 gap-4">
-        {rules.map(rule => {
-          const info = typeInfo(rule.type);
-          const isActive = rule.status === 'active';
+        {rules.map((rule) => {
+          const info = RULE_TYPE_INFO[rule.type] || RULE_TYPE_INFO.priority_zone;
+          const isActive = rule.enabled;
           return (
-            <div key={rule.id} className={`bg-white border-l-4 rounded-lg p-4 shadow-sm ${isActive ? `border-l-${info.color}-500` : 'border-l-slate-300 opacity-60'}`}>
+            <div
+              key={rule.id}
+              className={`bg-white border-l-4 rounded-lg p-4 shadow-sm transition ${
+                isActive ? "border-l-blue-500" : "border-l-slate-300 opacity-60"
+              }`}
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{info.icon}</span>
                   <span className="font-bold text-slate-700">{rule.name}</span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                  {isActive ? '已发布' : '已停用'}
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    isActive ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {isActive ? "已启用" : "已停用"}
                 </span>
               </div>
-              <div className="space-y-1 text-xs text-slate-600">
+              <div className="space-y-2 text-xs text-slate-600">
                 <div>类型: {info.name}</div>
-                <div>区域: {rule.area}</div>
-                <div>参数: {rule.value}</div>
-                <div className="text-slate-400">创建: {rule.created}</div>
+                <div className="flex items-center gap-2">
+                  <span>权重:</span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3}
+                    step={0.1}
+                    value={rule.weight}
+                    onChange={(e) => handleWeightChange(rule.id, e.target.value)}
+                    className="flex-1 accent-blue-500"
+                  />
+                  <span className="font-mono w-8 text-right">{rule.weight}</span>
+                </div>
+                <div className="text-slate-400 text-xs">
+                  {rule.type === "avoid_zone" && "影响区域: [18-22, 7-11] 污染区"}
+                  {rule.type === "priority_zone" && "影响区域: [23-27, 2-6] 手术区"}
+                  {rule.type === "smooth" && "全局平稳策略折扣"}
+                  {rule.type === "energy" && "全局节能策略折扣"}
+                </div>
               </div>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => toggleStatus(rule.id)}
-                  className={`px-3 py-1 rounded text-xs ${isActive ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}>
-                  {isActive ? '停用' : '发布'}
+                <button
+                  onClick={() => handleToggle(rule.id)}
+                  className={`px-3 py-1 rounded text-xs ${
+                    isActive
+                      ? "bg-red-100 text-red-600 hover:bg-red-200"
+                      : "bg-green-100 text-green-600 hover:bg-green-200"
+                  }`}
+                >
+                  {isActive ? "停用" : "启用"}
                 </button>
-                <button onClick={() => setRules(prev => prev.filter(r => r.id !== rule.id))}
-                  className="px-3 py-1 rounded text-xs bg-slate-100 text-slate-500 hover:bg-slate-200">删除</button>
+                <button
+                  onClick={() => handleDelete(rule.id)}
+                  className="px-3 py-1 rounded text-xs bg-slate-100 text-slate-500 hover:bg-slate-200"
+                >
+                  删除
+                </button>
               </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Path params */}
+      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">⚙️ 路径参数</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">策略</label>
+            <select
+              value={params.strategy}
+              onChange={(e) => updateParams({ strategy: e.target.value })}
+              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+            >
+              <option value="time">时间优先</option>
+              <option value="smooth">平稳优先</option>
+              <option value="energy">节能优先</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">灵敏度 ({params.sensitivity})</label>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={params.sensitivity}
+              onChange={(e) => updateParams({ sensitivity: Number(e.target.value) })}
+              className="w-full accent-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">缓冲距离 ({params.buffer})</label>
+            <input
+              type="range"
+              min={0}
+              max={3}
+              step={0.5}
+              value={params.buffer}
+              onChange={(e) => updateParams({ buffer: Number(e.target.value) })}
+              className="w-full accent-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">{rules.length}</div>
+          <div className="text-xs text-slate-500">总规则数</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{rules.filter((r) => r.enabled).length}</div>
+          <div className="text-xs text-slate-500">已启用</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-slate-400">{rules.filter((r) => !r.enabled).length}</div>
+          <div className="text-xs text-slate-500">已停用</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-red-600">{routes.filter((r) => r.reachable).length}</div>
+          <div className="text-xs text-slate-500">可达路径</div>
+        </div>
       </div>
 
       {/* Add Rule Modal */}
@@ -89,59 +204,54 @@ export default function TrafficRules() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">规则类型</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {RULE_TYPES.map(t => (
-                    <button key={t.id} onClick={() => setNewRule(r => ({ ...r, type: t.id }))}
-                      className={`p-2 rounded text-xs text-center border transition ${newRule.type === t.id ? `border-${t.color}-500 bg-${t.color}-50` : 'border-slate-200 hover:border-slate-300'}`}>
-                      <div className="text-lg">{t.icon}</div>
-                      <div>{t.name}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(RULE_TYPE_INFO).map(([type, info]) => (
+                    <button
+                      key={type}
+                      onClick={() => setNewRule((r) => ({ ...r, type }))}
+                      className={`p-2 rounded text-xs text-center border transition ${
+                        newRule.type === type ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="text-lg">{info.icon}</div>
+                      <div>{info.name}</div>
                     </button>
                   ))}
                 </div>
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">规则名称</label>
-                <input value={newRule.name} onChange={e => setNewRule(r => ({ ...r, name: e.target.value }))}
-                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 药房限速" />
+                <input
+                  value={newRule.name}
+                  onChange={(e) => setNewRule((r) => ({ ...r, name: e.target.value }))}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                  placeholder="如: ICU限速"
+                />
               </div>
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">适用区域</label>
-                <input value={newRule.area} onChange={e => setNewRule(r => ({ ...r, area: e.target.value }))}
-                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 药房区" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">参数值</label>
-                <input value={newRule.value} onChange={e => setNewRule(r => ({ ...r, value: e.target.value }))}
-                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="如: 0.5m/s" />
+                <label className="text-xs text-slate-500 mb-1 block">权重 ({newRule.weight})</label>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={3}
+                  step={0.1}
+                  value={newRule.weight}
+                  onChange={(e) => setNewRule((r) => ({ ...r, weight: Number(e.target.value) }))}
+                  className="w-full accent-blue-500"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-5">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded text-sm bg-slate-100 hover:bg-slate-200">取消</button>
-              <button onClick={handleAdd} className="px-4 py-2 rounded text-sm bg-blue-600 text-white hover:bg-blue-700">确认添加</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded text-sm bg-slate-100 hover:bg-slate-200">
+                取消
+              </button>
+              <button onClick={handleAdd} className="px-4 py-2 rounded text-sm bg-blue-600 text-white hover:bg-blue-700">
+                确认添加
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{rules.length}</div>
-          <div className="text-xs text-slate-500">总规则数</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{rules.filter(r => r.status === 'active').length}</div>
-          <div className="text-xs text-slate-500">已发布</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-slate-400">{rules.filter(r => r.status === 'inactive').length}</div>
-          <div className="text-xs text-slate-500">已停用</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{rules.filter(r => r.type === 'no_entry').length}</div>
-          <div className="text-xs text-slate-500">禁行规则</div>
-        </div>
-      </div>
     </div>
   );
 }
