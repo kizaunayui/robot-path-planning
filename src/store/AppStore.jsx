@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import {
   defaultMapData,
   defaultRules,
@@ -65,6 +65,60 @@ export function AppStoreProvider({ children }) {
   const addLog = useCallback((msg) => {
     setLogs((prev) => addLogEntry(prev, msg));
   }, []);
+
+  // === 模拟任务运行与机器人位置更新 Ticker ===
+  useEffect(() => {
+    const activeRunningTasks = activeTasks.filter(t => t.status === "执行中");
+    if (activeRunningTasks.length === 0) return;
+
+    const interval = setInterval(() => {
+      setActiveTasks((prevTasks) => {
+        let updated = false;
+        const nextTasks = prevTasks.map((t) => {
+          if (t.status !== "执行中") return t;
+          const route = activeRoutes[t.id];
+          if (!route || !route.path || route.path.length === 0) {
+            updated = true;
+            return { ...t, status: "已完成", progress: 100 };
+          }
+
+          const currentProgress = t.progress || 0;
+          const totalSteps = route.path.length;
+          // 每次 tick 推进 1 步
+          const currentStep = Math.min(totalSteps - 1, Math.floor((currentProgress / 100) * totalSteps));
+          const nextStep = currentStep + 1;
+          const nextProgress = Math.min(100, Math.round((nextStep / totalSteps) * 100));
+          const nextPos = route.path[Math.min(totalSteps - 1, nextStep)];
+
+          // 更新机器人位置
+          if (t.robotId) {
+            setRobots((prevRobots) =>
+              prevRobots.map((r) =>
+                r.id === t.robotId
+                  ? {
+                      ...r,
+                      pos: nextPos,
+                      battery: Math.max(10, r.battery - 1), // 消耗电量
+                      status: nextProgress >= 100 ? "idle" : "running",
+                    }
+                  : r
+              )
+            );
+          }
+
+          updated = true;
+          if (nextProgress >= 100) {
+            addLog(`🎉 任务已完成：${t.id}`);
+            return { ...t, status: "已完成", progress: 100 };
+          }
+          return { ...t, progress: nextProgress };
+        });
+        return updated ? nextTasks : prevTasks;
+      });
+    }, 1200);
+
+    return () => clearInterval(interval);
+  }, [activeTasks, activeRoutes, addLog]);
 
   // === 地图验证 ===
   const validation = validateMap(map);
