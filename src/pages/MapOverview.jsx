@@ -1,22 +1,26 @@
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
-import { PencilLine, Route, Repeat, Download, MapPin, Grid3X3, ShieldAlert, Crosshair, Flag, Ruler, RotateCw } from "lucide-react";
+import { PencilLine, Route, Repeat, Download, MapPin, Grid3X3, ShieldAlert, Crosshair, Flag, Ruler, RotateCw, Building2 } from "lucide-react";
+import { floors } from "../data/mapData";
 
 export default function MapOverview() {
-  const { map, routes, bestRoute, validation, logs, replanCount } = useAppStore();
+  const {
+    floorMap, currentFloor, setCurrentFloor, routes, bestRoute, validation,
+    allValidations, logs, replanCount, task,
+  } = useAppStore();
   const navigate = useNavigate();
 
-  const startName = "药房";
-  const endName = "消毒供应室";
+  const totalPoints = Object.values(floorMap).reduce((sum, f) => sum + Object.keys(f.points).length, 0);
+  const totalDynamic = Object.values(floorMap).reduce((sum, f) => sum + f.dynamic.length, 0);
 
   const stats = [
-    { label: "地图尺寸", value: `${map.cols}×${map.rows}`, icon: Grid3X3, color: "text-blue-400" },
-    { label: "可通行网格", value: validation.freeCells, icon: MapPin, color: "text-green-400" },
-    { label: "静态障碍", value: validation.wallCells, icon: ShieldAlert, color: "text-slate-400" },
-    { label: "动态障碍", value: map.dynamic.length, icon: ShieldAlert, color: "text-amber-400" },
-    { label: "当前起点", value: startName, icon: Crosshair, color: "text-emerald-400" },
-    { label: "当前终点", value: endName, icon: Flag, color: "text-red-400" },
+    { label: "楼层数", value: "3 层", icon: Building2, color: "text-blue-400" },
+    { label: "总科室数", value: totalPoints, icon: MapPin, color: "text-green-400" },
+    { label: "地图尺寸", value: `30×20`, icon: Grid3X3, color: "text-slate-300" },
+    { label: "动态障碍", value: totalDynamic, icon: ShieldAlert, color: "text-amber-400" },
+    { label: "当前起点", value: task.start, icon: Crosshair, color: "text-emerald-400" },
+    { label: "当前终点", value: task.end, icon: Flag, color: "text-red-400" },
     { label: "推荐路径长度", value: bestRoute ? `${bestRoute.length} 步` : "未计算", icon: Ruler, color: "text-purple-400" },
     { label: "重规划次数", value: replanCount, icon: RotateCw, color: "text-cyan-400" },
   ];
@@ -27,9 +31,9 @@ export default function MapOverview() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">路径规划总览</h2>
+          <h2 className="text-2xl font-bold text-slate-100">多楼层路径规划总览</h2>
           <p className="text-slate-400 text-sm mt-1">
-            医院院内物流场景 · 在线路径规划控制台
+            医院院内物流场景 · 三层楼跨楼层路径规划控制台
           </p>
         </div>
       </div>
@@ -50,21 +54,51 @@ export default function MapOverview() {
         })}
       </div>
 
-      {/* Map Preview */}
+      {/* Map Preview with floor tabs */}
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-white">地图预览</h3>
           <span className="text-xs text-slate-400">
-            {map.cols}×{map.rows} 网格 · {Object.keys(map.points).length} 科室节点
+            {currentFloor} · {Object.keys(floorMap[currentFloor]?.points || {}).length} 科室节点
           </span>
         </div>
         <HospitalMap
-          mapData={map}
+          floorMap={floorMap}
+          currentFloor={currentFloor}
+          onFloorChange={setCurrentFloor}
           routes={routes}
           bestRoute={bestRoute}
           highlightRoute={bestRoute}
           showLabels={true}
+          showFloorTabs={true}
         />
+      </div>
+
+      {/* Floor info cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {floors.map((f) => {
+          const fv = allValidations?.[f.id];
+          const fdata = floorMap[f.id];
+          return (
+            <div
+              key={f.id}
+              onClick={() => { setCurrentFloor(f.id); navigate('/map-editor'); }}
+              className="cursor-pointer bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-slate-500 transition"
+            >
+              <div className="text-sm font-bold text-white mb-1">
+                {f.id === '1F' ? '🏥' : f.id === '2F' ? '🔬' : '🛏️'} {f.name}
+              </div>
+              <div className="text-xs text-slate-400 mb-2">{f.description}</div>
+              <div className="flex gap-3 text-xs">
+                <span className="text-green-400">{fv?.points || 0} 科室</span>
+                <span className="text-amber-400">{fv?.dynamicObstacles || 0} 动态障碍</span>
+                <span className={fv?.connected ? "text-green-400" : "text-red-400"}>
+                  {fv?.connected ? "✓ 连通" : "✗ 不通"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Action Buttons */}
@@ -81,7 +115,7 @@ export default function MapOverview() {
           className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition"
         >
           <Route className="w-4 h-4" />
-          计算路径
+          跨楼层规划
         </button>
         <button
           onClick={() => navigate("/replan")}

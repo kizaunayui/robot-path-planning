@@ -1,17 +1,19 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import {
   defaultMapData,
+  multiFloorMap,
   defaultRules,
   defaultParams,
   cargoTypes,
   priorityLevels,
+  allPoints,
 } from "../data/mapData";
 import {
   planRoutes,
   validateMap,
+  validateAllFloors,
   updateMap as plannerUpdateMap,
-  resizeMap as plannerResizeMap,
-  randomMap as plannerRandomMap,
+  updateFloorMap as plannerUpdateFloorMap,
 } from "../utils/planner";
 
 const AppStoreContext = createContext(null);
@@ -23,16 +25,25 @@ function addLogEntry(logs, message) {
 }
 
 export function AppStoreProvider({ children }) {
-  // === 地图 ===
-  const [map, setMap] = useState(() => {
-    const saved = localStorage.getItem("pathplan_map");
-    return saved ? JSON.parse(saved) : { ...defaultMapData };
+  // === 多楼层地图 ===
+  const [floorMap, setFloorMap] = useState(() => {
+    const saved = localStorage.getItem("pathplan_floormap");
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* ignore */ }
+    }
+    return JSON.parse(JSON.stringify(multiFloorMap));
   });
 
-  // === 任务 ===
+  // === 当前楼层 ===
+  const [currentFloor, setCurrentFloor] = useState('1F');
+
+  // === 向后兼容的单层 map ===
+  const map = floorMap[currentFloor] || defaultMapData;
+
+  // === 任务（使用 allPoints 格式）===
   const [task, setTask] = useState({
-    start: "药房",
-    end: "消毒供应室",
+    start: "1F-药房",
+    end: "2F-消毒供应室",
     cargo: "medicine",
     priority: 2,
   });
@@ -61,62 +72,47 @@ export function AppStoreProvider({ children }) {
 
   // === 地图验证 ===
   const validation = validateMap(map);
+  const allValidations = validateAllFloors(floorMap);
 
-  // === 路径规划 ===
+  // === 保存楼层地图 ===
+  const saveFloorMap = useCallback((newFloorMap) => {
+    setFloorMap(newFloorMap);
+    localStorage.setItem("pathplan_floormap", JSON.stringify(newFloorMap));
+  }, []);
+
+  // === 路径规划（多楼层）===
   const doPlanRoutes = useCallback(
     (taskOverride, paramsOverride) => {
       const t = taskOverride || task;
       const p = paramsOverride || params;
-      const result = planRoutes(t, p, map, rules, cargoTypes, priorityLevels);
+      const result = planRoutes(t, p, floorMap, rules, cargoTypes, priorityLevels);
       setRoutes(result.routes);
       setBestRoute(result.bestRoute);
+      if (result.bestRoute && result.bestRoute.path?.length > 0 && result.bestRoute.path[0]?.floor) {
+        setCurrentFloor(result.bestRoute.path[0].floor);
+      }
       addLog(`完成路径计算：${t.start} → ${t.end}`);
       return result;
     },
-    [task, params, map, rules, addLog]
+    [task, params, floorMap, rules, addLog]
   );
 
-  // === 地图编辑 ===
+  // === 地图编辑（当前楼层）===
   const doUpdateMap = useCallback(
     (operation, cell) => {
-      const newMap = plannerUpdateMap(operation, cell, map);
-      setMap(newMap);
-      localStorage.setItem("pathplan_map", JSON.stringify(newMap));
-      addLog(`地图操作：${operation}`);
-      return newMap;
+      const newFloorMap = plannerUpdateFloorMap(operation, cell, floorMap, currentFloor);
+      saveFloorMap(newFloorMap);
+      addLog(`地图操作：${currentFloor} ${operation}`);
+      return newFloorMap[currentFloor];
     },
-    [map, addLog]
+    [floorMap, currentFloor, saveFloorMap, addLog]
   );
 
-  // === 调整地图尺寸 ===
-  const doResizeMap = useCallback(
-    (cols, rows) => {
-      const newMap = plannerResizeMap(cols, rows);
-      setMap(newMap);
-      setTask((t) => ({ ...t, start: "药房", end: "消毒供应室" }));
-      setRoutes([]);
-      setBestRoute(null);
-      localStorage.setItem("pathplan_map", JSON.stringify(newMap));
-      addLog(`调整地图尺寸：${cols}×${rows}`);
-      return newMap;
-    },
-    [addLog]
-  );
-
-  // === 随机地图 ===
-  const doRandomMap = useCallback(
-    (cols, rows, density) => {
-      const newMap = plannerRandomMap(cols || map.cols, rows || map.rows, density || 16);
-      setMap(newMap);
-      setTask((t) => ({ ...t, start: "药房", end: "消毒供应室" }));
-      setRoutes([]);
-      setBestRoute(null);
-      localStorage.setItem("pathplan_map", JSON.stringify(newMap));
-      addLog(`生成随机地图：${newMap.cols}×${newMap.rows} 密度${density || 16}%`);
-      return newMap;
-    },
-    [map.cols, map.rows, addLog]
-  );
+  // === 切换楼层 ===
+  const doSetCurrentFloor = useCallback((floorId) => {
+    setCurrentFloor(floorId);
+    addLog(`切换到${floorId}楼层`);
+  }, [addLog]);
 
   // === 更新规则 ===
   const doUpdateRules = useCallback(
@@ -142,27 +138,24 @@ export function AppStoreProvider({ children }) {
     [addLog]
   );
 
-  // === 重规划 ===
+  // === 重规划（多楼层）===
   const doReplan = useCallback(
     (obstacleCells) => {
-      // 保存旧路径
       if (bestRoute) {
         setPreviousRoute({ ...bestRoute });
       }
 
-      // 添加动态障碍
-      const newMap = JSON.parse(JSON.stringify(map));
+      // 在当前楼层添加动态障碍
+      const newFloorMap = JSON.parse(JSON.stringify(floorMap));
       obstacleCells.forEach((cell) => {
         const key = `${cell[0]},${cell[1]}`;
-        if (!newMap.dynamic.some((p) => `${p[0]},${p[1]}` === key)) {
-          newMap.dynamic.push(cell);
+        if (!newFloorMap[currentFloor].dynamic.some((p) => `${p[0]},${p[1]}` === key)) {
+          newFloorMap[currentFloor].dynamic.push(cell);
         }
       });
-      setMap(newMap);
-      localStorage.setItem("pathplan_map", JSON.stringify(newMap));
+      saveFloorMap(newFloorMap);
 
-      // 重新规划
-      const result = planRoutes(task, params, newMap, rules, cargoTypes, priorityLevels);
+      const result = planRoutes(task, params, newFloorMap, rules, cargoTypes, priorityLevels);
       setRoutes(result.routes);
       setBestRoute(result.bestRoute);
 
@@ -183,16 +176,17 @@ export function AppStoreProvider({ children }) {
       };
       setReplanHistory((prev) => [historyEntry, ...prev].slice(0, 20));
 
-      addLog(`重规划完成（第${newCount}次），新增${obstacleCells.length}个动态障碍`);
+      addLog(`重规划完成（第${newCount}次），${currentFloor}新增${obstacleCells.length}个动态障碍`);
       return result;
     },
-    [map, task, params, rules, bestRoute, replanCount, addLog]
+    [floorMap, task, params, rules, bestRoute, replanCount, addLog, currentFloor, saveFloorMap]
   );
 
   // === 恢复默认 ===
   const doResetState = useCallback(() => {
-    setMap({ ...defaultMapData });
-    setTask({ start: "药房", end: "消毒供应室", cargo: "medicine", priority: 2 });
+    const freshMap = JSON.parse(JSON.stringify(multiFloorMap));
+    setFloorMap(freshMap);
+    setTask({ start: "1F-药房", end: "2F-消毒供应室", cargo: "medicine", priority: 2 });
     setRoutes([]);
     setBestRoute(null);
     setRules([...defaultRules]);
@@ -200,13 +194,17 @@ export function AppStoreProvider({ children }) {
     setReplanCount(0);
     setReplanHistory([]);
     setPreviousRoute(null);
+    setCurrentFloor('1F');
+    localStorage.removeItem("pathplan_floormap");
     localStorage.removeItem("pathplan_map");
     addLog("恢复默认地图和规则");
   }, [addLog]);
 
   const value = {
     // 数据
-    map,
+    map,              // 当前楼层的 mapData（向后兼容）
+    floorMap,         // 多楼层地图
+    currentFloor,     // 当前楼层 ID
     task,
     routes,
     bestRoute,
@@ -214,23 +212,25 @@ export function AppStoreProvider({ children }) {
     params,
     logs,
     validation,
+    allValidations,
     replanCount,
     replanHistory,
     previousRoute,
     cargoTypes,
     priorityLevels,
+    allPoints,
 
     // 操作
     setTask,
+    setCurrentFloor: doSetCurrentFloor,
     planRoutes: doPlanRoutes,
     updateMap: doUpdateMap,
-    resizeMap: doResizeMap,
-    randomMap: doRandomMap,
     updateRules: doUpdateRules,
     updateParams: doUpdateParams,
     replan: doReplan,
     resetState: doResetState,
     addLog,
+    saveFloorMap,
   };
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;

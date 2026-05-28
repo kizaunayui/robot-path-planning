@@ -1,45 +1,142 @@
 /**
- * 医院网格地图数据 - 对标 planner.py BASE.map
- * 30x20 网格，边界墙 + 内部障碍 + 动态障碍 + 科室节点
+ * 医院网格地图数据 - 多楼层版本
+ * 1F/2F/3F 三层结构，电梯连接各层
  */
 
-// 默认地图配置
+// 楼层定义
+export const floors = [
+  { id: '1F', name: '一层', description: '门诊大厅/药房/急诊科/收费处' },
+  { id: '2F', name: '二层', description: '检验科/手术部/器械库/消毒中心' },
+  { id: '3F', name: '三层', description: '住院部/ICU/血库/护士站' },
+];
+
+// 电梯位置（每层相同坐标，连接三层）
+export const elevatorPosition = [14, 10];
+
+// 电梯跨层代价
+export const elevatorCost = 5;
+
+// 多楼层地图数据
+export const multiFloorMap = {
+  '1F': {
+    cols: 30,
+    rows: 20,
+    walls: [
+      // 边界墙
+      ...Array.from({ length: 30 }, (_, x) => [x, 0]),
+      ...Array.from({ length: 30 }, (_, x) => [x, 19]),
+      ...Array.from({ length: 20 }, (_, y) => [0, y]),
+      ...Array.from({ length: 20 }, (_, y) => [29, y]),
+      // 1F 内部水平墙 y=7, x:5-23 (跳过 x=14 电梯通道)
+      ...Array.from({ length: 19 }, (_, i) => [5 + i, 7]).filter(([x]) => x !== 14),
+      // 1F 内部水平墙 y=14, x:4-22 (跳过 x=9 通道)
+      ...Array.from({ length: 19 }, (_, i) => [4 + i, 14]).filter(([x]) => x !== 9),
+      // 1F 内部垂直墙 x=10, y:2-7 (跳过 y=5 通道)
+      ...Array.from({ length: 6 }, (_, i) => [10, 2 + i]).filter(([, y]) => y !== 5),
+      // 1F 内部垂直墙 x=22, y:2-7 (跳过 y=5 通道)
+      ...Array.from({ length: 6 }, (_, i) => [22, 2 + i]).filter(([, y]) => y !== 5),
+    ],
+    dynamic: [[12, 10], [13, 10], [21, 8]],
+    points: {
+      '药房': [2, 3],
+      '门诊大厅': [7, 10],
+      '急诊科': [25, 3],
+      '收费处': [14, 3],
+      '电梯厅': [14, 10],
+      '充电站': [2, 14],
+    },
+  },
+  '2F': {
+    cols: 30,
+    rows: 20,
+    walls: [
+      // 边界墙
+      ...Array.from({ length: 30 }, (_, x) => [x, 0]),
+      ...Array.from({ length: 30 }, (_, x) => [x, 19]),
+      ...Array.from({ length: 20 }, (_, y) => [0, y]),
+      ...Array.from({ length: 20 }, (_, y) => [29, y]),
+      // 2F 内部水平墙 y=6, x:3-18 (跳过 x=10 通道)
+      ...Array.from({ length: 16 }, (_, i) => [3 + i, 6]).filter(([x]) => x !== 10),
+      // 2F 内部水平墙 y=12, x:8-26 (跳过 x=14 电梯通道)
+      ...Array.from({ length: 19 }, (_, i) => [8 + i, 12]).filter(([x]) => x !== 14),
+      // 2F 内部垂直墙 x=20, y:2-18 (跳过 y=10 通道)
+      ...Array.from({ length: 17 }, (_, i) => [20, 2 + i]).filter(([, y]) => y !== 10),
+      // 2F 内部垂直墙 x=8, y:8-18 (跳过 y=14 通道)
+      ...Array.from({ length: 11 }, (_, i) => [8, 8 + i]).filter(([, y]) => y !== 14),
+    ],
+    dynamic: [[15, 5], [10, 15]],
+    points: {
+      '检验科': [13, 3],
+      '手术室': [25, 4],
+      '消毒供应室': [27, 15],
+      '器械库': [5, 8],
+      '电梯厅': [14, 10],
+    },
+  },
+  '3F': {
+    cols: 30,
+    rows: 20,
+    walls: [
+      // 边界墙
+      ...Array.from({ length: 30 }, (_, x) => [x, 0]),
+      ...Array.from({ length: 30 }, (_, x) => [x, 19]),
+      ...Array.from({ length: 20 }, (_, y) => [0, y]),
+      ...Array.from({ length: 20 }, (_, y) => [29, y]),
+      // 3F 内部水平墙 y=5, x:2-20 (跳过 x=14 电梯通道)
+      ...Array.from({ length: 19 }, (_, i) => [2 + i, 5]).filter(([x]) => x !== 14),
+      // 3F 内部水平墙 y=11, x:6-24 (跳过 x=14 电梯通道)
+      ...Array.from({ length: 19 }, (_, i) => [6 + i, 11]).filter(([x]) => x !== 14),
+      // 3F 内部垂直墙 x=18, y:2-11 (跳过 y=8 通道，ICU门口)
+      ...Array.from({ length: 10 }, (_, i) => [18, 2 + i]).filter(([, y]) => y !== 8),
+      // 3F 内部垂直墙 x=10, y:12-18 (跳过 y=16 通道)
+      ...Array.from({ length: 7 }, (_, i) => [10, 12 + i]).filter(([, y]) => y !== 16),
+    ],
+    dynamic: [[8, 8], [22, 14]],
+    points: {
+      'ICU': [18, 8],
+      '血库': [6, 4],
+      '住院区A': [4, 16],
+      '住院区B': [17, 16],
+      '护士站': [14, 6],
+      '电梯厅': [14, 10],
+    },
+  },
+};
+
+// 所有楼层的所有科室（带楼层前缀，用于起终点选择）
+export const allPoints = [];
+Object.entries(multiFloorMap).forEach(([floorId, floorData]) => {
+  Object.entries(floorData.points).forEach(([name, pos]) => {
+    allPoints.push({
+      id: `${floorId}-${name}`,
+      floor: floorId,
+      name,
+      pos,
+    });
+  });
+});
+
+// 向后兼容：默认地图数据（1F）
 export const defaultMapData = {
-  cols: 30,
-  rows: 20,
-  walls: [
-    // 边界墙
-    ...Array.from({ length: 30 }, (_, x) => [x, 0]),
-    ...Array.from({ length: 30 }, (_, x) => [x, 19]),
-    ...Array.from({ length: 20 }, (_, y) => [0, y]),
-    ...Array.from({ length: 20 }, (_, y) => [29, y]),
-    // 内部水平墙 y=7, x:5-23 (跳过 x=14 电梯通道)
-    ...Array.from({ length: 19 }, (_, i) => [5 + i, 7]).filter(([x]) => x !== 14),
-    // 内部水平墙 y=13, x:4-21 (跳过 x=9 通道)
-    ...Array.from({ length: 18 }, (_, i) => [4 + i, 13]).filter(([x]) => x !== 9),
-    // 内部垂直墙 x=20, y:3-16 (跳过 y=10 通道)
-    ...Array.from({ length: 14 }, (_, i) => [20, 3 + i]).filter(([, y]) => y !== 10),
-  ],
-  dynamic: [[12, 10], [13, 10], [21, 8]],
+  ...multiFloorMap['1F'],
   points: {
-    药房: [2, 3],
-    检验科: [13, 3],
-    手术室: [25, 4],
-    住院区A: [4, 16],
-    住院区B: [17, 16],
-    消毒供应室: [27, 15],
-    电梯厅: [14, 10],
+    ...multiFloorMap['1F'].points,
+    '检验科': multiFloorMap['2F'].points['检验科'],
+    '手术室': multiFloorMap['2F'].points['手术室'],
+    '住院区A': multiFloorMap['3F'].points['住院区A'],
+    '住院区B': multiFloorMap['3F'].points['住院区B'],
+    '消毒供应室': multiFloorMap['2F'].points['消毒供应室'],
   },
 };
 
 // 默认规则（6条）
 export const defaultRules = [
-  { id: "R1", name: "手术区优先通行", type: "priority_zone", enabled: true, weight: 1.3 },
-  { id: "R2", name: "污染区避让", type: "avoid_zone", enabled: true, weight: 2.0 },
-  { id: "R3", name: "平稳优先", type: "smooth", enabled: true, weight: 1.2 },
-  { id: "R4", name: "低电量节能", type: "energy", enabled: true, weight: 1.1 },
-  { id: "R5", name: "禁行区", type: "no_go", enabled: false, weight: 99 },
-  { id: "R6", name: "限速区", type: "speed_limit", enabled: false, weight: 1.8 },
+  { id: "R1", name: "手术区优先通行", type: "priority_zone", enabled: true, weight: 1.3, floors: ["2F"] },
+  { id: "R2", name: "污染区避让", type: "avoid_zone", enabled: true, weight: 2.0, floors: ["1F"] },
+  { id: "R3", name: "平稳优先", type: "smooth", enabled: true, weight: 1.2, floors: ["1F", "2F", "3F"] },
+  { id: "R4", name: "低电量节能", type: "energy", enabled: true, weight: 1.1, floors: ["1F", "2F", "3F"] },
+  { id: "R5", name: "禁行区", type: "no_go", enabled: false, weight: 99, floors: ["1F"] },
+  { id: "R6", name: "限速区", type: "speed_limit", enabled: false, weight: 1.8, floors: ["3F"] },
 ];
 
 // 默认参数
@@ -65,26 +162,49 @@ export const priorityLevels = [
   { id: 4, name: "低", costMultiplier: 1.2, color: "#6b7280" },
 ];
 
-// 科室颜色
+// 科室颜色（多楼层通用）
 export const pointColors = {
-  药房: "#4caf50",
-  检验科: "#2196f3",
-  手术室: "#f44336",
-  住院区A: "#9c27b0",
-  住院区B: "#9c27b0",
-  消毒供应室: "#ff9800",
-  电梯厅: "#607d8b",
+  '药房': "#4caf50",
+  '门诊大厅': "#00bcd4",
+  '急诊科': "#f44336",
+  '收费处': "#ff9800",
+  '电梯厅': "#607d8b",
+  '充电站': "#ffc107",
+  '检验科': "#2196f3",
+  '手术室': "#f44336",
+  '消毒供应室': "#ff9800",
+  '器械库': "#795548",
+  'ICU': "#e91e63",
+  '血库': "#9c27b0",
+  '住院区A': "#9c27b0",
+  '住院区B': "#9c27b0",
+  '护士站': "#3f51b5",
 };
 
 // 科室图标
 export const pointIcons = {
-  药房: "💊",
-  检验科: "🔬",
-  手术室: "🏥",
-  住院区A: "🛏️",
-  住院区B: "🛏️",
-  消毒供应室: "🧹",
-  电梯厅: "🛗",
+  '药房': "💊",
+  '门诊大厅': "🏥",
+  '急诊科': "🚑",
+  '收费处': "💰",
+  '电梯厅': "🛗",
+  '充电站': "🔋",
+  '检验科': "🔬",
+  '手术室': "🏥",
+  '消毒供应室': "🧹",
+  '器械库': "🔧",
+  'ICU': "❤️‍🩹",
+  '血库': "🩸",
+  '住院区A': "🛏️",
+  '住院区B': "🛏️",
+  '护士站': "👩‍⚕️",
+};
+
+// 楼层颜色
+export const floorColors = {
+  '1F': "#3b82f6",
+  '2F': "#10b981",
+  '3F': "#f59e0b",
 };
 
 // 策略颜色

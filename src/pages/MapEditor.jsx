@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
-import { Eraser, Plus, AlertTriangle, Dices, Trash2, Save, RotateCcw, CheckCircle, XCircle } from "lucide-react";
+import { Eraser, Plus, AlertTriangle, Dices, Trash2, RotateCcw, CheckCircle, XCircle } from "lucide-react";
 
 const TOOLS = [
   { id: "wall", icon: Plus, label: "绘制墙壁" },
@@ -10,11 +10,9 @@ const TOOLS = [
 ];
 
 export default function MapEditor() {
-  const { map, updateMap, resizeMap, randomMap, resetState, validation } = useAppStore();
+  const { floorMap, currentFloor, setCurrentFloor, updateMap, validation, allValidations, resetState } = useAppStore();
+
   const [tool, setTool] = useState("wall");
-  const [resizeCols, setResizeCols] = useState(map.cols);
-  const [resizeRows, setResizeRows] = useState(map.rows);
-  const [density, setDensity] = useState(16);
 
   const handleCellClick = useCallback(
     (cell) => {
@@ -29,11 +27,14 @@ export default function MapEditor() {
     [tool, updateMap]
   );
 
+  const currentValidation = allValidations?.[currentFloor] || validation;
+  const currentMapData = floorMap[currentFloor];
+
   return (
     <div className="p-6 space-y-4">
       <h2 className="text-2xl font-bold text-slate-100">地图编辑</h2>
       <p className="text-slate-400 text-sm">
-        绘制静态障碍与动态障碍，编辑结果将影响后续路径规划。
+        绘制静态障碍与动态障碍，编辑结果将影响后续路径规划。支持分楼层编辑。
       </p>
 
       {/* Toolbar */}
@@ -84,102 +85,88 @@ export default function MapEditor() {
         </button>
       </div>
 
-      {/* Resize & Random */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
-        <h3 className="text-sm font-semibold text-white mb-3">地图设置</h3>
-        <div className="grid grid-cols-6 gap-4 items-end">
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">列数 (16-60)</label>
-            <input
-              type="number"
-              min={16}
-              max={60}
-              value={resizeCols}
-              onChange={(e) => setResizeCols(Number(e.target.value))}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">行数 (12-40)</label>
-            <input
-              type="number"
-              min={12}
-              max={40}
-              value={resizeRows}
-              onChange={(e) => setResizeRows(Number(e.target.value))}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <button
-            onClick={() => resizeMap(resizeCols, resizeRows)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            调整尺寸
-          </button>
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">障碍密度 (0-42%)</label>
-            <input
-              type="number"
-              min={0}
-              max={42}
-              value={density}
-              onChange={(e) => setDensity(Number(e.target.value))}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <button
-            onClick={() => randomMap(resizeCols, resizeRows, density)}
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm"
-          >
-            随机地图
-          </button>
-          <div className="text-xs text-slate-400">
-            当前: {map.cols}×{map.rows} | 墙壁: {map.walls.length} | 动态: {map.dynamic.length}
-          </div>
-        </div>
-      </div>
-
-      {/* Map */}
+      {/* Map with floor tabs */}
       <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
         <HospitalMap
-          mapData={map}
+          floorMap={floorMap}
+          currentFloor={currentFloor}
+          onFloorChange={setCurrentFloor}
           editMode={tool}
           onCellClick={handleCellClick}
           showLabels={true}
           showGrid={true}
+          showFloorTabs={true}
         />
       </div>
 
-      {/* Validation */}
+      {/* Validation per floor */}
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-400">{validation.freeCells}</div>
-          <div className="text-xs text-slate-400">自由格</div>
+          <div className="text-2xl font-bold text-blue-400">{currentValidation.freeCells}</div>
+          <div className="text-xs text-slate-400">自由格 ({currentFloor})</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-slate-300">{validation.wallCells}</div>
+          <div className="text-2xl font-bold text-slate-300">{currentValidation.wallCells}</div>
           <div className="text-xs text-slate-400">墙壁格</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-amber-400">{validation.dynamicObstacles}</div>
+          <div className="text-2xl font-bold text-amber-400">{currentValidation.dynamicObstacles}</div>
           <div className="text-xs text-slate-400">动态障碍</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-400">{validation.points}</div>
+          <div className="text-2xl font-bold text-green-400">{currentValidation.points}</div>
           <div className="text-xs text-slate-400">科室节点</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
           <div className="flex items-center justify-center gap-2">
-            {validation.connected ? (
+            {currentValidation.connected ? (
               <CheckCircle className="w-6 h-6 text-green-400" />
             ) : (
               <XCircle className="w-6 h-6 text-red-400" />
             )}
-            <span className={`text-lg font-bold ${validation.connected ? "text-green-400" : "text-red-400"}`}>
-              {validation.connected ? "可达" : "不可达"}
+            <span className={`text-lg font-bold ${currentValidation.connected ? "text-green-400" : "text-red-400"}`}>
+              {currentValidation.connected ? "可达" : "不可达"}
             </span>
           </div>
-          <div className="text-xs text-slate-400">起点→终点连通性</div>
+          <div className="text-xs text-slate-400">连通性</div>
+        </div>
+      </div>
+
+      {/* All floors overview */}
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-white mb-3">各楼层概览</h3>
+        <div className="grid grid-cols-3 gap-4">
+          {['1F', '2F', '3F'].map((fid) => {
+            const v = allValidations?.[fid];
+            if (!v) return null;
+            const fdata = floorMap[fid];
+            return (
+              <div key={fid} className="bg-slate-700/50 rounded-lg p-3 text-xs space-y-1">
+                <div className="font-bold text-white text-sm mb-2">{fid}</div>
+                <div className="flex justify-between text-slate-400">
+                  <span>科室</span>
+                  <span className="text-green-400">{v.points}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>动态障碍</span>
+                  <span className="text-amber-400">{v.dynamicObstacles}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>连通</span>
+                  <span className={v.connected ? "text-green-400" : "text-red-400"}>
+                    {v.connected ? "✓" : "✗"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {Object.keys(fdata.points).map((name) => (
+                    <span key={name} className="bg-slate-600 text-slate-300 px-1.5 py-0.5 rounded text-xs">
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

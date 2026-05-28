@@ -1,26 +1,41 @@
 import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
-import { Repeat, AlertTriangle, Play, RotateCcw, ArrowRight, Clock, Battery, Ruler, Zap } from "lucide-react";
+import { Repeat, AlertTriangle, RotateCcw, ArrowRight, Clock, Battery, Ruler, Zap } from "lucide-react";
 
 export default function ReplanPage() {
-  const { map, routes, bestRoute, previousRoute, replanCount, replanHistory, replan, planRoutes, addLog } = useAppStore();
+  const {
+    floorMap, currentFloor, setCurrentFloor, routes, bestRoute, previousRoute,
+    replanCount, replanHistory, replan, planRoutes, addLog,
+  } = useAppStore();
+
   const [highlightRoute, setHighlightRoute] = useState(null);
   const [showPrevious, setShowPrevious] = useState(false);
   const [obstacleCount, setObstacleCount] = useState(3);
   const [comparing, setComparing] = useState(false);
 
-  // 生成随机障碍位置（在当前路径上）
+  // 生成随机障碍位置（在当前路径的当前楼层段上）
   const generateObstaclesOnPath = useCallback(() => {
     if (!bestRoute || !bestRoute.path || bestRoute.path.length < 5) {
       addLog("请先计算路径，再模拟动态障碍");
       return [];
     }
+
+    // 获取当前楼层的路径节点
     const path = bestRoute.path;
+    const floorNodes = path.filter((p) => {
+      if (p.floor) return p.floor === currentFloor;
+      return true;
+    });
+
+    if (floorNodes.length < 3) {
+      addLog("当前楼层路径太短，无法生成障碍");
+      return [];
+    }
+
     const obstacles = [];
-    // 在路径中间段随机选取位置
-    const startIdx = Math.floor(path.length * 0.2);
-    const endIdx = Math.floor(path.length * 0.8);
+    const startIdx = Math.floor(floorNodes.length * 0.2);
+    const endIdx = Math.floor(floorNodes.length * 0.8);
     const used = new Set();
     for (let i = 0; i < obstacleCount && i < (endIdx - startIdx); i++) {
       let idx;
@@ -28,10 +43,11 @@ export default function ReplanPage() {
         idx = startIdx + Math.floor(Math.random() * (endIdx - startIdx));
       } while (used.has(idx));
       used.add(idx);
-      obstacles.push(path[idx]);
+      const node = floorNodes[idx];
+      obstacles.push(node.pos || node);
     }
     return obstacles;
-  }, [bestRoute, obstacleCount, addLog]);
+  }, [bestRoute, obstacleCount, addLog, currentFloor]);
 
   const handleSimulateObstacle = () => {
     const obstacles = generateObstaclesOnPath();
@@ -42,7 +58,6 @@ export default function ReplanPage() {
 
     replan(obstacles);
 
-    // 3秒后关闭对比模式
     setTimeout(() => {
       setComparing(false);
     }, 5000);
@@ -59,7 +74,7 @@ export default function ReplanPage() {
     <div className="p-6 space-y-5">
       <h2 className="text-2xl font-bold text-slate-100">动态障碍与重规划</h2>
       <p className="text-slate-400 text-sm">
-        模拟动态障碍突然出现在当前路径上，自动检测路径阻断并触发实时重规划。
+        模拟动态障碍突然出现在当前楼层路径上，自动检测路径阻断并触发实时重规划。支持跨楼层电梯绕行。
       </p>
 
       {/* Controls */}
@@ -74,6 +89,24 @@ export default function ReplanPage() {
             onChange={(e) => setObstacleCount(Number(e.target.value))}
             className="w-20 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
           />
+        </div>
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">障碍楼层</label>
+          <div className="flex gap-1">
+            {['1F', '2F', '3F'].map((fid) => (
+              <button
+                key={fid}
+                onClick={() => setCurrentFloor(fid)}
+                className={`px-3 py-2 rounded text-sm transition ${
+                  currentFloor === fid
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {fid}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={handleSimulateObstacle}
@@ -112,6 +145,9 @@ export default function ReplanPage() {
             {bestRoute.length > previousRoute.length && (
               <span className="text-red-400 ml-2">(+{bestRoute.length - previousRoute.length} 步)</span>
             )}
+            {bestRoute.elevatorCount > 0 && (
+              <span className="text-yellow-400 ml-2">🛗 含{bestRoute.elevatorCount}次电梯换乘</span>
+            )}
           </div>
         </div>
       )}
@@ -135,11 +171,14 @@ export default function ReplanPage() {
           </div>
         </div>
         <HospitalMap
-          mapData={map}
+          floorMap={floorMap}
+          currentFloor={currentFloor}
+          onFloorChange={setCurrentFloor}
           routes={showPrevious && previousRoute ? [...routes, { ...previousRoute, strategy: "previous" }] : routes}
           bestRoute={bestRoute}
           highlightRoute={highlightRoute || bestRoute}
           showLabels={true}
+          showFloorTabs={true}
         />
       </div>
 
@@ -189,7 +228,7 @@ export default function ReplanPage() {
       )}
 
       {/* Replan History Log */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-white mb-3">重规划日志</h3>
         {replanHistory.length === 0 ? (
           <p className="text-slate-500 text-sm">暂无重规划记录，请先计算路径后模拟动态障碍。</p>

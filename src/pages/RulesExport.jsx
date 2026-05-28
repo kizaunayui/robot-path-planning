@@ -16,7 +16,6 @@ export default function RulesExport() {
   const [beforeRoutes, setBeforeRoutes] = useState(null);
 
   const handleToggle = (id) => {
-    // 保存当前路径指标作为"修改前"
     if (!beforeRoutes && bestRoute) {
       setBeforeRoutes(routes.map((r) => ({ ...r })));
     }
@@ -45,12 +44,14 @@ export default function RulesExport() {
     }
     const data = {
       timestamp: new Date().toISOString(),
-      task: { start: "药房", end: "消毒供应室" },
+      task: { start: "1F-药房", end: "2F-消毒供应室" },
       bestRoute: {
         strategy: bestRoute.strategy,
         name: bestRoute.name,
         length: bestRoute.length,
         turns: bestRoute.turns,
+        elevatorCount: bestRoute.elevatorCount || 0,
+        segments: bestRoute.segments || [],
         estimatedMinutes: bestRoute.estimatedMinutes,
         energy: bestRoute.energy,
         score: bestRoute.score,
@@ -62,11 +63,12 @@ export default function RulesExport() {
         reachable: r.reachable,
         length: r.length,
         turns: r.turns,
+        elevatorCount: r.elevatorCount || 0,
         estimatedMinutes: r.estimatedMinutes,
         energy: r.energy,
         score: r.score,
       })),
-      activeRules: rules.filter((r) => r.enabled).map((r) => ({ id: r.id, name: r.name, weight: r.weight })),
+      activeRules: rules.filter((r) => r.enabled).map((r) => ({ id: r.id, name: r.name, weight: r.weight, floors: r.floors })),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -83,9 +85,9 @@ export default function RulesExport() {
       addLog("请先计算路径再导出");
       return;
     }
-    const header = "策略,名称,可达,路径长度,转弯次数,预计耗时,电量消耗,综合评分";
+    const header = "策略,名称,可达,路径长度,转弯次数,电梯换乘,预计耗时,电量消耗,综合评分";
     const rows = routes.map((r) =>
-      [r.strategy, r.name, r.reachable ? "是" : "否", r.length, r.turns, r.estimatedMinutes, r.energy, r.score].join(",")
+      [r.strategy, r.name, r.reachable ? "是" : "否", r.length, r.turns, r.elevatorCount || 0, r.estimatedMinutes, r.energy, r.score].join(",")
     );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -107,7 +109,7 @@ export default function RulesExport() {
         <div>
           <h2 className="text-2xl font-bold text-slate-100">规则配置与结果导出</h2>
           <p className="text-slate-400 text-sm mt-1">
-            配置交通规则代价权重，导出路径规划结果。
+            配置交通规则代价权重（按楼层生效），导出多楼层路径规划结果。
           </p>
         </div>
         <button
@@ -145,6 +147,9 @@ export default function RulesExport() {
               </div>
               <div className="space-y-2 text-xs text-slate-400">
                 <div>类型: <span className={info.color}>{info.name}</span></div>
+                {rule.floors && (
+                  <div>生效楼层: <span className="text-blue-400">{rule.floors.join(', ')}</span></div>
+                )}
                 <div className="flex items-center gap-2">
                   <span>权重:</span>
                   <input
@@ -159,12 +164,12 @@ export default function RulesExport() {
                   <span className="font-mono w-10 text-right text-slate-300">{rule.weight}</span>
                 </div>
                 <div className="text-slate-500">
-                  {rule.type === "avoid_zone" && "影响区域: [18-22, 7-11] 污染区"}
-                  {rule.type === "priority_zone" && "影响区域: [23-27, 2-6] 手术区"}
-                  {rule.type === "smooth" && "全局平稳策略折扣"}
-                  {rule.type === "energy" && "全局节能策略折扣"}
-                  {rule.type === "no_go" && "影响区域: [12-16, 8-12] 电梯厅周围"}
-                  {rule.type === "speed_limit" && "影响区域: [2-6, 14-18] 住院区走廊"}
+                  {rule.type === "avoid_zone" && "影响区域: 1F [18-22, 7-11] 污染区"}
+                  {rule.type === "priority_zone" && "影响区域: 2F [23-27, 2-6] 手术区"}
+                  {rule.type === "smooth" && "全局平稳策略折扣（所有楼层）"}
+                  {rule.type === "energy" && "全局节能策略折扣（所有楼层）"}
+                  {rule.type === "no_go" && "影响区域: 1F [12-16, 8-12] 电梯厅周围"}
+                  {rule.type === "speed_limit" && "影响区域: 3F [2-6, 14-18] 住院区走廊"}
                 </div>
               </div>
               <div className="mt-2">

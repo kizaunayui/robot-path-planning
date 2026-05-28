@@ -1,28 +1,72 @@
 /**
- * 医院机器人路径规划核心算法
- * 移植自 planner.py，支持三种策略：time / smooth / energy
+ * 医院机器人路径规划核心算法 - 多楼层版本
+ * 支持三种策略：time / smooth / energy
+ * 支持电梯跨楼层路径规划
  */
+
+import { multiFloorMap, elevatorPosition, elevatorCost, floors } from "../data/mapData";
 
 // ==================== 工具函数 ====================
 
-function heuristic(a, b) {
-  return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+function heuristic(startState, goalState) {
+  // 同层曼哈顿距离 + 跨层代价
+  const dx = Math.abs(startState.pos[0] - goalState.pos[0]);
+  const dy = Math.abs(startState.pos[1] - goalState.pos[1]);
+  const floorDiff = startState.floor !== goalState.floor ? elevatorCost : 0;
+  return dx + dy + floorDiff;
 }
 
-function neighbors(pos, cols, rows, blocked) {
+function stateKey(state) {
+  return `${state.floor},${state.pos[0]},${state.pos[1]}`;
+}
+
+function neighbors(state, floorMap) {
+  const { floor, pos } = state;
   const [x, y] = pos;
+  const mapData = floorMap[floor];
+  if (!mapData) return [];
+
+  const walls = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
+  const dynamic = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
+  const blocked = new Set([...walls, ...dynamic]);
+
   const cells = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
-  return cells.filter(
-    (p) => p[0] >= 0 && p[0] < cols && p[1] >= 0 && p[1] < rows && !blocked.has(`${p[0]},${p[1]}`)
-  );
+  const result = [];
+
+  // 同层普通移动
+  for (const [nx, ny] of cells) {
+    if (nx >= 0 && nx < mapData.cols && ny >= 0 && ny < mapData.rows && !blocked.has(`${nx},${ny}`)) {
+      result.push({ floor, pos: [nx, ny], isElevator: false });
+    }
+  }
+
+  // 电梯跨层移动：当前在电梯位置时可切换楼层
+  const [ex, ey] = elevatorPosition;
+  if (x === ex && y === ey) {
+    for (const f of floors) {
+      if (f.id !== floor) {
+        // 检查目标楼层电梯位置是否可通行
+        const targetMap = floorMap[f.id];
+        if (targetMap) {
+          const targetWalls = new Set(targetMap.walls.map((p) => `${p[0]},${p[1]}`));
+          const targetDynamic = new Set(targetMap.dynamic.map((p) => `${p[0]},${p[1]}`));
+          if (!targetWalls.has(`${ex},${ey}`) && !targetDynamic.has(`${ex},${ey}`)) {
+            result.push({ floor: f.id, pos: [ex, ey], isElevator: true });
+          }
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
-function rebuild(parent, pos) {
+function rebuildPath(parent, endKey) {
   const out = [];
-  let key = `${pos[0]},${pos[1]}`;
+  let key = endKey;
   while (key) {
-    const [x, y] = key.split(",").map(Number);
-    out.push([x, y]);
+    const [floor, x, y] = key.split(",");
+    out.push({ floor, pos: [Number(x), Number(y)] });
     key = parent[key];
   }
   return out.reverse();
@@ -30,14 +74,19 @@ function rebuild(parent, pos) {
 
 // ==================== 移动代价 ====================
 
-export function moveCost(pos, nxt, prev, strategy, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
+export function moveCost(fromState, toState, prevState, strategy, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
   let cost = 1.0;
 
-  // smooth 策略：转弯惩罚
-  if (strategy === "smooth" && prev) {
-    const old = [pos[0] - prev[0], pos[1] - prev[1]];
-    const dir = [nxt[0] - pos[0], nxt[1] - pos[1]];
-    if (old[0] !== dir[0] || old[1] !== dir[1]) {
+  // 电梯跨层代价
+  if (toState.isElevator) {
+    cost = elevatorCost;
+  }
+
+  // smooth 策略：转弯惩罚（同层内）
+  if (strategy === "smooth" && prevState && !toState.isElevator) {
+    const oldDir = [fromState.pos[0] - prevState.pos[0], fromState.pos[1] - prevState.pos[1]];
+    const newDir = [toState.pos[0] - fromState.pos[0], toState.pos[1] - fromState.pos[1]];
+    if (oldDir[0] !== newDir[0] || oldDir[1] !== newDir[1]) {
       cost += 0.8;
     }
   }
@@ -51,17 +100,22 @@ export function moveCost(pos, nxt, prev, strategy, rules, cargoMultiplier = 1, p
   cost *= cargoMultiplier;
   cost *= priorityMultiplier;
 
-  // 规则影响
+  // 规则影响（按楼层过滤）
+  const currentFloor = toState.floor;
   for (const rule of rules) {
     if (!rule.enabled) continue;
+    // 规则楼层过滤
+    if (rule.floors && !rule.floors.includes(currentFloor)) continue;
 
-    // 污染区避让 (R2) - 影响区域 [18-22, 7-11]
-    if (rule.type === "avoid_zone" && nxt[0] >= 18 && nxt[0] <= 22 && nxt[1] >= 7 && nxt[1] <= 11) {
+    const [nx, ny] = toState.pos;
+
+    // 污染区避让 (R2) - 1F [18-22, 7-11]
+    if (rule.type === "avoid_zone" && nx >= 18 && nx <= 22 && ny >= 7 && ny <= 11) {
       cost += rule.weight;
     }
 
-    // 手术区优先通行 (R1) - 手术室附近 [23-27, 2-6]
-    if (rule.type === "priority_zone" && nxt[0] >= 23 && nxt[0] <= 27 && nxt[1] >= 2 && nxt[1] <= 6) {
+    // 手术区优先通行 (R1) - 2F [23-27, 2-6]
+    if (rule.type === "priority_zone" && nx >= 23 && nx <= 27 && ny >= 2 && ny <= 6) {
       cost *= 0.85;
     }
 
@@ -75,13 +129,13 @@ export function moveCost(pos, nxt, prev, strategy, rules, cargoMultiplier = 1, p
       cost *= 0.92;
     }
 
-    // 禁行区 (R5) - 电梯厅周围 [12-16, 8-12]
-    if (rule.type === "no_go" && nxt[0] >= 12 && nxt[0] <= 16 && nxt[1] >= 8 && nxt[1] <= 12) {
+    // 禁行区 (R5) - 1F 电梯厅周围 [12-16, 8-12]
+    if (rule.type === "no_go" && nx >= 12 && nx <= 16 && ny >= 8 && ny <= 12) {
       cost += rule.weight;
     }
 
-    // 限速区 (R6) - 住院区走廊 [2-6, 14-18]
-    if (rule.type === "speed_limit" && nxt[0] >= 2 && nxt[0] <= 6 && nxt[1] >= 14 && nxt[1] <= 18) {
+    // 限速区 (R6) - 3F 住院区走廊 [2-6, 14-18]
+    if (rule.type === "speed_limit" && nx >= 2 && nx <= 6 && ny >= 14 && ny <= 18) {
       cost *= rule.weight;
     }
   }
@@ -89,18 +143,23 @@ export function moveCost(pos, nxt, prev, strategy, rules, cargoMultiplier = 1, p
   return cost;
 }
 
-// ==================== A* 搜索 ====================
+// ==================== 多楼层 A* 搜索 ====================
 
-export function astar(start, goal, strategy, mapData, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
-  const walls = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
-  const dynamic = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
-  const blocked = new Set([...walls, ...dynamic]);
-  const { cols, rows } = mapData;
+export function astar(start, goal, strategy, floorMap, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
+  // start = {floor: '1F', pos: [x, y]}
+  // goal = {floor: '3F', pos: [x, y]}
+  // floorMap = multiFloorMap
 
-  const startKey = `${start[0]},${start[1]}`;
-  const goalKey = `${goal[0]},${goal[1]}`;
+  const startKey = stateKey(start);
+  const goalKey = stateKey(goal);
 
-  const openSet = [{ f: heuristic(start, goal), g: 0, pos: start, prev: null, key: startKey }];
+  const openSet = [{
+    f: heuristic(start, goal),
+    g: 0,
+    state: start,
+    key: startKey,
+    prevKey: null,
+  }];
   const parent = {};
   const best = { [startKey]: 0 };
   const visited = new Set();
@@ -108,28 +167,28 @@ export function astar(start, goal, strategy, mapData, rules, cargoMultiplier = 1
   while (openSet.length > 0) {
     openSet.sort((a, b) => a.f - b.f);
     const current = openSet.shift();
-    const { g, pos, key } = current;
+    const { g, state, key } = current;
 
     if (key in parent) continue;
-    parent[key] = current.prev;
+    parent[key] = current.prevKey;
     visited.add(key);
 
     if (key === goalKey) {
-      return { path: rebuild(parent, pos), visited };
+      return { path: rebuildPath(parent, goalKey), visited };
     }
 
-    for (const nxt of neighbors(pos, cols, rows, blocked)) {
-      const nxtKey = `${nxt[0]},${nxt[1]}`;
-      const prevPos = current.prev ? current.prev.split(",").map(Number) : null;
-      const ng = g + moveCost(pos, nxt, prevPos, strategy, rules, cargoMultiplier, priorityMultiplier);
+    for (const nxt of neighbors(state, floorMap)) {
+      const nxtKey = stateKey(nxt);
+      const prevState = current.prevKey ? parseState(current.prevKey) : null;
+      const ng = g + moveCost(state, nxt, prevState, strategy, rules, cargoMultiplier, priorityMultiplier);
       if (ng < (best[nxtKey] ?? 999999)) {
         best[nxtKey] = ng;
         openSet.push({
           f: ng + heuristic(nxt, goal),
           g: ng,
-          pos: nxt,
-          prev: key,
+          state: nxt,
           key: nxtKey,
+          prevKey: key,
         });
       }
     }
@@ -138,22 +197,44 @@ export function astar(start, goal, strategy, mapData, rules, cargoMultiplier = 1
   return { path: [], visited };
 }
 
+function parseState(key) {
+  const [floor, x, y] = key.split(",");
+  return { floor, pos: [Number(x), Number(y)] };
+}
+
 // ==================== 路径报告 ====================
 
 export function routeReport(strategy, path, visited) {
   let turns = 0;
+  let elevatorCount = 0;
+
   for (let i = 2; i < path.length; i++) {
     const a = path[i - 2];
     const b = path[i - 1];
     const c = path[i];
-    const oldDir = [b[0] - a[0], b[1] - a[1]];
-    const newDir = [c[0] - b[0], c[1] - b[1]];
+
+    // 跨楼层不计入转弯
+    if (b.floor !== c.floor || a.floor !== b.floor) {
+      if (b.floor !== c.floor) elevatorCount++;
+      continue;
+    }
+
+    const oldDir = [b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]];
+    const newDir = [c.pos[0] - b.pos[0], c.pos[1] - b.pos[1]];
     if (oldDir[0] !== newDir[0] || oldDir[1] !== newDir[1]) {
       turns++;
     }
   }
 
-  const score = path.length > 0 ? path.length + turns * 0.8 + visited.size * 0.02 : 999999;
+  // 检查最后一段跨层
+  if (path.length >= 2) {
+    const last = path[path.length - 1];
+    const prev = path[path.length - 2];
+    if (last.floor !== prev.floor) elevatorCount++;
+  }
+
+  const totalSteps = path.length > 0 ? path.length - 1 : 0;
+  const score = totalSteps > 0 ? totalSteps + turns * 0.8 + visited.size * 0.02 : 999999;
 
   const names = {
     time: "最优路径A-时间优先",
@@ -161,28 +242,58 @@ export function routeReport(strategy, path, visited) {
     energy: "应急路径C-节能优先",
   };
 
+  // 按楼层分段
+  const segments = [];
+  let currentSegment = null;
+  for (const node of path) {
+    if (!currentSegment || currentSegment.floor !== node.floor) {
+      if (currentSegment) segments.push(currentSegment);
+      currentSegment = { floor: node.floor, nodes: [node] };
+    } else {
+      currentSegment.nodes.push(node);
+    }
+  }
+  if (currentSegment) segments.push(currentSegment);
+
+  // 找每个分段的起止科室名
+  const segmentInfo = segments.map((seg) => {
+    const firstNode = seg.nodes[0];
+    const lastNode = seg.nodes[seg.nodes.length - 1];
+    return {
+      floor: seg.floor,
+      start: firstNode.pos,
+      end: lastNode.pos,
+      length: seg.nodes.length - 1,
+    };
+  });
+
   return {
     strategy,
     name: names[strategy],
     reachable: path.length > 0,
     path,
-    visited: [...visited].map((k) => k.split(",").map(Number)),
-    length: Math.max(0, path.length - 1),
+    visited: [...visited].map((k) => {
+      const parts = k.split(",");
+      return { floor: parts[0], pos: [Number(parts[1]), Number(parts[2])] };
+    }),
+    length: totalSteps,
     turns,
-    estimatedMinutes: Math.round(Math.max(0, path.length - 1) * 0.35 * 10) / 10,
-    energy: Math.round((Math.max(0, path.length - 1) * 0.42 + turns * 0.08) * 10) / 10,
+    elevatorCount,
+    segments: segmentInfo,
+    estimatedMinutes: Math.round(totalSteps * 0.35 * 10) / 10,
+    energy: Math.round((totalSteps * 0.42 + turns * 0.08 + elevatorCount * 0.5) * 10) / 10,
     score: Math.round(score * 100) / 100,
   };
 }
 
 // ==================== 路径规划主入口 ====================
 
-export function planRoutes(task, params, mapData, rules, cargoTypes, priorityLevels) {
-  const start = mapData.points[task.start];
-  const goal = mapData.points[task.end];
-  if (!start || !goal) return { routes: [], bestRoute: null };
+export function planRoutes(task, params, floorMap, rules, cargoTypes, priorityLevels) {
+  // 解析起终点（支持 allPoints 格式 '1F-药房' 或传统名称格式）
+  const startState = resolvePoint(task.start, floorMap);
+  const goalState = resolvePoint(task.end, floorMap);
+  if (!startState || !goalState) return { routes: [], bestRoute: null };
 
-  // 货物和优先级影响代价
   const cargo = (cargoTypes || []).find((c) => c.id === task.cargo);
   const priority = (priorityLevels || []).find((p) => p.id === task.priority);
   const cargoMultiplier = cargo ? cargo.costMultiplier : 1;
@@ -190,7 +301,7 @@ export function planRoutes(task, params, mapData, rules, cargoTypes, priorityLev
 
   const routes = [];
   for (const strategy of ["time", "smooth", "energy"]) {
-    const { path, visited } = astar(start, goal, strategy, mapData, rules, cargoMultiplier, priorityMultiplier);
+    const { path, visited } = astar(startState, goalState, strategy, floorMap, rules, cargoMultiplier, priorityMultiplier);
     routes.push(routeReport(strategy, path, visited));
   }
 
@@ -200,14 +311,38 @@ export function planRoutes(task, params, mapData, rules, cargoTypes, priorityLev
   return { routes, bestRoute: best };
 }
 
-// ==================== 地图验证 ====================
+// 解析起终点名称为 {floor, pos} 格式
+function resolvePoint(nameOrId, floorMap) {
+  if (!nameOrId) return null;
+
+  // 格式: '1F-药房'
+  if (nameOrId.includes('-')) {
+    const dashIdx = nameOrId.indexOf('-');
+    const floor = nameOrId.substring(0, dashIdx);
+    const name = nameOrId.substring(dashIdx + 1);
+    const mapData = floorMap[floor];
+    if (mapData && mapData.points[name]) {
+      return { floor, pos: mapData.points[name] };
+    }
+  }
+
+  // 传统格式：在所有楼层中查找
+  for (const [floorId, mapData] of Object.entries(floorMap)) {
+    if (mapData.points[nameOrId]) {
+      return { floor: floorId, pos: mapData.points[nameOrId] };
+    }
+  }
+
+  return null;
+}
+
+// ==================== 单层地图验证 ====================
 
 export function validateMap(mapData) {
   const wallSet = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
   const dynamicSet = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
   const freeCells = mapData.cols * mapData.rows - wallSet.size;
 
-  // 连通性检查：BFS 从 (1,1) 出发能到达多少格
   const blocked = new Set([...wallSet, ...dynamicSet]);
   const visited = new Set();
   const queue = [[1, 1]];
@@ -223,7 +358,6 @@ export function validateMap(mapData) {
     }
   }
 
-  // 检查所有科室是否可达
   const pointsReachable = Object.values(mapData.points).every(
     (p) => visited.has(`${p[0]},${p[1]}`)
   );
@@ -237,7 +371,17 @@ export function validateMap(mapData) {
   };
 }
 
-// ==================== 地图操作 ====================
+// ==================== 多楼层验证 ====================
+
+export function validateAllFloors(floorMap) {
+  const results = {};
+  for (const [floorId, mapData] of Object.entries(floorMap)) {
+    results[floorId] = validateMap(mapData);
+  }
+  return results;
+}
+
+// ==================== 地图操作（单层） ====================
 
 export function updateMap(operation, cell, mapData) {
   const newMap = JSON.parse(JSON.stringify(mapData));
@@ -260,7 +404,6 @@ export function updateMap(operation, cell, mapData) {
   } else if (operation === "clearDynamic") {
     newMap.dynamic = [];
   } else if (operation === "clearAll") {
-    // 保留边界墙和科室
     const boundarySet = new Set();
     for (let x = 0; x < newMap.cols; x++) {
       boundarySet.add(`${x},0`);
@@ -283,76 +426,10 @@ export function updateMap(operation, cell, mapData) {
   return newMap;
 }
 
-// ==================== 调整地图尺寸 ====================
+// ==================== 多楼层地图操作 ====================
 
-export function resizeMap(cols, rows) {
-  cols = Math.max(16, Math.min(60, Math.floor(cols)));
-  rows = Math.max(12, Math.min(40, Math.floor(rows)));
-
-  const walls = boundaryWalls(cols, rows);
-  const points = defaultPoints(cols, rows);
-
-  return {
-    cols,
-    rows,
-    walls,
-    dynamic: [],
-    points,
-  };
-}
-
-// ==================== 随机地图 ====================
-
-export function randomMap(cols, rows, density) {
-  cols = Math.max(16, Math.min(60, Math.floor(cols)));
-  rows = Math.max(12, Math.min(40, Math.floor(rows)));
-  density = Math.max(0, Math.min(42, Math.floor(density)));
-
-  const points = defaultPoints(cols, rows);
-  const protectedSet = new Set(Object.values(points).map((p) => `${p[0]},${p[1]}`));
-  const walls = boundaryWalls(cols, rows);
-
-  for (let y = 1; y < rows - 1; y++) {
-    for (let x = 1; x < cols - 1; x++) {
-      if (protectedSet.has(`${x},${y}`)) continue;
-      if (Math.random() * 100 <= density) {
-        walls.push([x, y]);
-      }
-    }
-  }
-
-  return {
-    cols,
-    rows,
-    walls,
-    dynamic: [],
-    points,
-  };
-}
-
-// ==================== 辅助函数 ====================
-
-function boundaryWalls(cols, rows) {
-  const walls = [];
-  for (let x = 0; x < cols; x++) {
-    walls.push([x, 0]);
-    walls.push([x, rows - 1]);
-  }
-  for (let y = 0; y < rows; y++) {
-    walls.push([0, y]);
-    walls.push([cols - 1, y]);
-  }
-  return walls;
-}
-
-function defaultPoints(cols, rows) {
-  return {
-    药房: [2, 3],
-    检验科: [Math.max(3, Math.floor(cols / 2) - 2), 3],
-    手术室: [cols - 5, 4],
-    住院区A: [4, rows - 4],
-    住院区B: [Math.max(5, Math.floor(cols / 2) + 2), rows - 4],
-    消毒供应室: [cols - 4, rows - 5],
-    电梯厅: [Math.floor(cols / 2), Math.floor(rows / 2)],
-  };
+export function updateFloorMap(operation, cell, floorMap, currentFloor) {
+  const newFloorMap = JSON.parse(JSON.stringify(floorMap));
+  newFloorMap[currentFloor] = updateMap(operation, cell, newFloorMap[currentFloor]);
+  return newFloorMap;
 }

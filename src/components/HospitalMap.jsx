@@ -1,12 +1,15 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { pointColors, pointIcons, strategyColors } from "../data/mapData";
+import { pointColors, pointIcons, strategyColors, elevatorPosition, floorColors, multiFloorMap } from "../data/mapData";
 
 /**
- * 升级版网格地图渲染组件
- * 支持：精美医院网格、墙体3D阴影、特殊交通规则区高亮、Marching Ants 动态路径、机器人平滑Lerp移动与朝向旋转、悬浮提示
+ * 多楼层网格地图渲染组件
+ * 支持：楼层切换Tab、电梯标记、跨楼层路径分段显示
  */
 export default function HospitalMap({
-  mapData,
+  mapData,              // 当前楼层的 mapData（向后兼容）
+  floorMap = null,      // 多楼层地图数据（新）
+  currentFloor = '1F',  // 当前楼层
+  onFloorChange = null, // 楼层切换回调
   routes = [],
   bestRoute = null,
   highlightRoute = null,
@@ -17,13 +20,18 @@ export default function HospitalMap({
   onCellClick,
   editMode = null,
   className = "",
+  showFloorTabs = true,
 }) {
   const canvasRef = useRef(null);
   const [hoveredCell, setHoveredCell] = useState(null);
 
-  const { cols, rows, walls, dynamic, points } = mapData;
+  // 使用 floorMap 获取当前楼层数据，或向后兼容使用 mapData
+  const activeMapData = floorMap ? floorMap[currentFloor] : mapData;
+  if (!activeMapData) return null;
 
-  // 单元格配置 — 放大到36px，文字更清晰
+  const { cols, rows, walls, dynamic, points } = activeMapData;
+
+  // 单元格配置
   const CELL = 36;
   const W = cols * CELL;
   const H = rows * CELL;
@@ -34,23 +42,67 @@ export default function HospitalMap({
   // 机器人平滑运动位置追踪
   const robotVisualsRef = useRef({});
 
-  // 规则区域定义（深色主题适配）
-  const zones = [
-    {
-      name: "手术优先区",
-      x: 23, y: 2, w: 5, h: 5,
-      color: "rgba(16, 185, 129, 0.15)",
-      borderColor: "rgba(16, 185, 129, 0.6)",
-      textColor: "#34d399",
-    },
-    {
-      name: "污染避让区",
-      x: 18, y: 7, w: 5, h: 5,
-      color: "rgba(239, 68, 68, 0.15)",
-      borderColor: "rgba(239, 68, 68, 0.6)",
-      textColor: "#f87171",
+  // 当前楼层的路径（多楼层路径过滤）
+  const getFloorRoutes = useCallback(() => {
+    if (!routes || routes.length === 0) return [];
+    return routes.map((route) => {
+      if (!route.path || route.path.length === 0) return route;
+      // 如果路径节点有 floor 属性，过滤当前楼层
+      if (route.path[0]?.floor) {
+        const floorPath = route.path.filter((p) => p.floor === currentFloor).map((p) => p.pos);
+        return { ...route, path: floorPath };
+      }
+      return route;
+    }).filter((r) => r.path && r.path.length > 0);
+  }, [routes, currentFloor]);
+
+  const getFloorHighlight = useCallback(() => {
+    if (!highlightRoute || !highlightRoute.path || highlightRoute.path.length === 0) return null;
+    if (highlightRoute.path[0]?.floor) {
+      const floorPath = highlightRoute.path.filter((p) => p.floor === currentFloor).map((p) => p.pos);
+      if (floorPath.length === 0) return null;
+      return { ...highlightRoute, path: floorPath };
     }
-  ];
+    return highlightRoute;
+  }, [highlightRoute, currentFloor]);
+
+  // 规则区域定义
+  const getZones = useCallback(() => {
+    if (currentFloor === '1F') {
+      return [
+        {
+          name: "污染避让区",
+          x: 18, y: 7, w: 5, h: 5,
+          color: "rgba(239, 68, 68, 0.15)",
+          borderColor: "rgba(239, 68, 68, 0.6)",
+          textColor: "#f87171",
+        },
+      ];
+    }
+    if (currentFloor === '2F') {
+      return [
+        {
+          name: "手术优先区",
+          x: 23, y: 2, w: 5, h: 5,
+          color: "rgba(16, 185, 129, 0.15)",
+          borderColor: "rgba(16, 185, 129, 0.6)",
+          textColor: "#34d399",
+        },
+      ];
+    }
+    if (currentFloor === '3F') {
+      return [
+        {
+          name: "限速区",
+          x: 2, y: 14, w: 5, h: 5,
+          color: "rgba(245, 158, 11, 0.15)",
+          borderColor: "rgba(245, 158, 11, 0.6)",
+          textColor: "#fbbf24",
+        },
+      ];
+    }
+    return [];
+  }, [currentFloor]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,6 +114,10 @@ export default function HospitalMap({
     let animationId;
     let dashOffset = 0;
 
+    const floorRoutes = getFloorRoutes();
+    const floorHighlight = getFloorHighlight();
+    const zones = getZones();
+
     const render = () => {
       // 1. 清空画布与深色背景
       ctx.fillStyle = "#0f172a";
@@ -71,13 +127,11 @@ export default function HospitalMap({
       zones.forEach((z) => {
         ctx.fillStyle = z.color;
         ctx.fillRect(z.x * CELL, z.y * CELL, z.w * CELL, z.h * CELL);
-
         ctx.strokeStyle = z.borderColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 4]);
         ctx.strokeRect(z.x * CELL, z.y * CELL, z.w * CELL, z.h * CELL);
         ctx.setLineDash([]);
-
         if (showLabels) {
           ctx.fillStyle = z.textColor;
           ctx.font = `bold 13px sans-serif`;
@@ -105,34 +159,38 @@ export default function HospitalMap({
         }
       }
 
-      // 4. 墙壁 (带立体浮雕效果)
+      // 4. 墙壁
       walls.forEach(([wx, wy]) => {
-        // 主体
         ctx.fillStyle = "#334155";
         ctx.fillRect(wx * CELL + 1, wy * CELL + 1, CELL - 2, CELL - 2);
-
-        // 立体斜角效果
         ctx.strokeStyle = "#475569";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(wx * CELL + 1.5, wy * CELL + 1.5, CELL - 3, CELL - 3);
-
-        // 高亮角
         ctx.fillStyle = "#64748b";
         ctx.fillRect(wx * CELL + 1, wy * CELL + 1, CELL - 2, 3);
       });
 
-      // 5. 动态障碍
+      // 5. 电梯位置特殊标记
+      const [elevX, elevY] = elevatorPosition;
+      if (!wallSet.has(`${elevX},${elevY}`)) {
+        ctx.fillStyle = "rgba(234, 179, 8, 0.2)";
+        ctx.fillRect(elevX * CELL + 1, elevY * CELL + 1, CELL - 2, CELL - 2);
+        ctx.strokeStyle = "#eab308";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(elevX * CELL + 1.5, elevY * CELL + 1.5, CELL - 3, CELL - 3);
+        ctx.setLineDash([]);
+      }
+
+      // 6. 动态障碍
       dynamic.forEach(([dx, dy]) => {
         ctx.fillStyle = "#ff9800";
         ctx.globalAlpha = 0.8;
         ctx.fillRect(dx * CELL + 1, dy * CELL + 1, CELL - 2, CELL - 2);
         ctx.globalAlpha = 1;
-
         ctx.strokeStyle = "#fbbf24";
         ctx.lineWidth = 2.5;
         ctx.strokeRect(dx * CELL + 1.5, dy * CELL + 1.5, CELL - 3, CELL - 3);
-
-        // 警告标识 ⚠
         ctx.fillStyle = "#fff";
         ctx.font = `bold ${Math.floor(CELL * 0.55)}px sans-serif`;
         ctx.textAlign = "center";
@@ -140,30 +198,31 @@ export default function HospitalMap({
         ctx.fillText("⚠", dx * CELL + CELL / 2, dy * CELL + CELL / 2);
       });
 
-      // 6. 历史访问网格
-      if (showVisited && highlightRoute?.visited) {
+      // 7. 历史访问网格
+      if (showVisited && floorHighlight?.visited) {
         ctx.fillStyle = "#3b82f6";
         ctx.globalAlpha = 0.2;
-        highlightRoute.visited.forEach(([vx, vy]) => {
+        const visArr = floorHighlight.visited.filter((v) => {
+          if (v.floor) return v.floor === currentFloor;
+          return true;
+        });
+        visArr.forEach((v) => {
+          const [vx, vy] = v.pos || v;
           ctx.fillRect(vx * CELL + 1, vy * CELL + 1, CELL - 2, CELL - 2);
         });
         ctx.globalAlpha = 1;
       }
 
-      // 7. 路径高亮 (Marching Ants 流光线条)
-      const allRoutes = routes.filter((r) => r.reachable);
+      // 8. 路径高亮
+      const allRoutes = floorRoutes.filter((r) => r.reachable);
       allRoutes.forEach((route) => {
-        const isActive = highlightRoute && route.strategy === highlightRoute.strategy;
+        const isActive = floorHighlight && route.strategy === floorHighlight.strategy;
         const color = strategyColors[route.strategy] || "#10b981";
-
         ctx.strokeStyle = color;
         ctx.lineWidth = isActive ? 5 : 2.5;
         ctx.globalAlpha = isActive ? 1 : 0.4;
-
-        // 流光效果
         ctx.setLineDash(isActive ? [10, 7] : [6, 4]);
         ctx.lineDashOffset = isActive ? -dashOffset : 0;
-
         ctx.beginPath();
         route.path.forEach(([px, py], i) => {
           const cx = px * CELL + CELL / 2;
@@ -176,14 +235,39 @@ export default function HospitalMap({
         ctx.globalAlpha = 1;
       });
 
-      // 8. 科室节点 (Styled Nodes)
+      // 9. 跨楼层路径电梯标记
+      if (highlightRoute?.path?.length > 1 && highlightRoute.path[0]?.floor) {
+        const fullPath = highlightRoute.path;
+        for (let i = 0; i < fullPath.length - 1; i++) {
+          if (fullPath[i].floor !== fullPath[i + 1].floor && fullPath[i].floor === currentFloor) {
+            const [px, py] = fullPath[i].pos;
+            const cx = px * CELL + CELL / 2;
+            const cy = py * CELL + CELL / 2;
+            // 绘制电梯换乘箭头
+            ctx.fillStyle = "#eab308";
+            ctx.beginPath();
+            ctx.arc(cx, cy, CELL * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = "#fff";
+            ctx.font = `bold ${Math.floor(CELL * 0.35)}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const dir = fullPath[i + 1].floor > fullPath[i].floor ? "▲" : "▼";
+            ctx.fillText(`🛗${dir}`, cx, cy);
+          }
+        }
+      }
+
+      // 10. 科室节点
       Object.entries(points).forEach(([name, [px, py]]) => {
         const color = pointColors[name] || "#64748b";
         const icon = pointIcons[name] || "📍";
         const cx = px * CELL + CELL / 2;
         const cy = py * CELL + CELL / 2;
 
-        // 呼吸光晕
         const wave = 3 * Math.sin(Date.now() / 300);
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.2;
@@ -192,17 +276,14 @@ export default function HospitalMap({
         ctx.fill();
         ctx.globalAlpha = 1;
 
-        // 圆圈主体（放大）
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(cx, cy, CELL * 0.48, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // 图标（放大）
         if (showLabels) {
           ctx.fillStyle = "#ffffff";
           ctx.font = `${Math.floor(CELL * 0.5)}px sans-serif`;
@@ -210,11 +291,9 @@ export default function HospitalMap({
           ctx.textBaseline = "middle";
           ctx.fillText(icon, cx, cy);
 
-          // 科室名称 — 浅色加粗，深色主题下清晰可读
           ctx.fillStyle = "#f1f5f9";
           ctx.font = `bold ${Math.floor(CELL * 0.4)}px sans-serif`;
           ctx.textBaseline = "top";
-          // 文字加暗色描边增强对比度
           ctx.strokeStyle = "#0f172a";
           ctx.lineWidth = 3;
           ctx.strokeText(name, cx, py * CELL + CELL + 4);
@@ -222,12 +301,12 @@ export default function HospitalMap({
         }
       });
 
-      // 9. 路径起终点大圆标 (S / E)
-      if (highlightRoute?.path?.length > 1) {
-        const start = highlightRoute.path[0];
-        const end = highlightRoute.path[highlightRoute.path.length - 1];
+      // 11. 路径起终点标记
+      const hlPath = floorHighlight?.path;
+      if (hlPath?.length > 1) {
+        const start = hlPath[0];
+        const end = hlPath[hlPath.length - 1];
 
-        // Start (S)
         ctx.fillStyle = "#10b981";
         ctx.beginPath();
         ctx.arc(start[0] * CELL + CELL / 2, start[1] * CELL + CELL / 2, CELL * 0.48, 0, Math.PI * 2);
@@ -241,7 +320,6 @@ export default function HospitalMap({
         ctx.textBaseline = "middle";
         ctx.fillText("S", start[0] * CELL + CELL / 2, start[1] * CELL + CELL / 2);
 
-        // End (E)
         ctx.fillStyle = "#ef4444";
         ctx.beginPath();
         ctx.arc(end[0] * CELL + CELL / 2, end[1] * CELL + CELL / 2, CELL * 0.48, 0, Math.PI * 2);
@@ -253,65 +331,43 @@ export default function HospitalMap({
         ctx.fillText("E", end[0] * CELL + CELL / 2, end[1] * CELL + CELL / 2);
       }
 
-      // 10. 机器人平滑Lerp绘制 (Animated AGV Robots)
+      // 12. 机器人
       robots.forEach((r) => {
         const [targetX, targetY] = r.pos;
-
-        // 初始化或平滑插值计算
         if (!robotVisualsRef.current[r.id]) {
           robotVisualsRef.current[r.id] = { x: targetX, y: targetY, angle: 0 };
         }
         const vis = robotVisualsRef.current[r.id];
-
         const dx = targetX - vis.x;
         const dy = targetY - vis.y;
-
-        // 平滑位置 Lerp
         vis.x += dx * 0.08;
         vis.y += dy * 0.08;
-
-        // 平滑角度计算
         if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
           const targetAngle = Math.atan2(dy, dx);
           let diff = targetAngle - vis.angle;
-          // 环绕角修整
           while (diff < -Math.PI) diff += Math.PI * 2;
           while (diff > Math.PI) diff -= Math.PI * 2;
           vis.angle += diff * 0.15;
         }
-
         const cx = vis.x * CELL + CELL / 2;
         const cy = vis.y * CELL + CELL / 2;
-
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(vis.angle);
-
-        // 绘制精美的AGV车体 (带状态阴影)
         const isCharging = r.status === "charging";
         const isRunning = r.status === "running";
         const themeColor = isCharging ? "#eab308" : isRunning ? "#3b82f6" : "#10b981";
-
-        // 外发光
         ctx.shadowColor = themeColor;
         ctx.shadowBlur = isRunning ? 8 + 3 * Math.sin(Date.now() / 150) : 5;
-
-        // AGV主体底座
         ctx.fillStyle = "#1e293b";
         ctx.beginPath();
         ctx.roundRect(-CELL * 0.42, -CELL * 0.37, CELL * 0.84, CELL * 0.74, 5);
         ctx.fill();
-
-        // 取消阴影
         ctx.shadowBlur = 0;
-
-        // 顶部核心舱面板
         ctx.fillStyle = themeColor;
         ctx.beginPath();
         ctx.roundRect(-CELL * 0.27, -CELL * 0.27, CELL * 0.54, CELL * 0.54, 4);
         ctx.fill();
-
-        // 车头前大灯 (黄色小三角形)
         ctx.fillStyle = "#fbbf24";
         ctx.beginPath();
         ctx.moveTo(CELL * 0.4, -CELL * 0.16);
@@ -319,8 +375,6 @@ export default function HospitalMap({
         ctx.lineTo(CELL * 0.4, CELL * 0.16);
         ctx.closePath();
         ctx.fill();
-
-        // 车尾警告闪光灯
         if (isRunning) {
           const flash = Math.floor(Date.now() / 200) % 2 === 0;
           ctx.fillStyle = flash ? "#ef4444" : "#7f1d1d";
@@ -329,18 +383,12 @@ export default function HospitalMap({
           ctx.arc(-CELL * 0.37, CELL * 0.16, 3, 0, Math.PI * 2);
           ctx.fill();
         }
-
         ctx.restore();
-
-        // 绘制机器人文本标签与电量条 (直接在网格上，不旋转)
-        // 机器人 ID — 加大字号
         ctx.fillStyle = "#ffffff";
         ctx.font = `bold ${Math.floor(CELL * 0.35)}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(r.id, cx, cy - 1);
-
-        // 机器人名称悬浮字
         if (showLabels) {
           ctx.fillStyle = "#94a3b8";
           ctx.font = `${Math.floor(CELL * 0.28)}px sans-serif`;
@@ -349,22 +397,18 @@ export default function HospitalMap({
           ctx.strokeText(r.name, cx, cy - CELL * 0.55 - 4);
           ctx.fillText(r.name, cx, cy - CELL * 0.55 - 4);
         }
-
-        // 小电量条 (充电时会绿色跳动)
         const barW = CELL * 0.75;
         const barH = 3.5;
         const bx = cx - barW / 2;
         const by = cy + CELL * 0.55 + 3;
-
         ctx.fillStyle = "#334155";
         ctx.fillRect(bx, by, barW, barH);
-
         const batColor = r.battery > 50 ? "#22c55e" : r.battery > 20 ? "#f59e0b" : "#ef4444";
         ctx.fillStyle = batColor;
         ctx.fillRect(bx, by, barW * (r.battery / 100), barH);
       });
 
-      // 11. 鼠标悬停网格交互圈
+      // 13. 编辑模式悬停
       if (hoveredCell && editMode) {
         const [hx, hy] = hoveredCell;
         ctx.strokeStyle = "#3b82f6";
@@ -372,7 +416,6 @@ export default function HospitalMap({
         ctx.strokeRect(hx * CELL + 1, hy * CELL + 1, CELL - 2, CELL - 2);
       }
 
-      // Ticker 推进
       dashOffset = (dashOffset + 0.3) % 24;
       animationId = requestAnimationFrame(render);
     };
@@ -382,9 +425,9 @@ export default function HospitalMap({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [mapData, routes, highlightRoute, robots, showGrid, showLabels, showVisited, hoveredCell, editMode, W, H, CELL, cols, rows, wallSet, dynamicSet]);
+  }, [activeMapData, routes, highlightRoute, robots, showGrid, showLabels, showVisited, hoveredCell, editMode, W, H, CELL, cols, rows, wallSet, dynamicSet, currentFloor, getFloorRoutes, getFloorHighlight, getZones]);
 
-  // 鼠标交互坐标映射
+  // 鼠标交互
   const getCell = useCallback(
     (e) => {
       const canvas = canvasRef.current;
@@ -422,8 +465,30 @@ export default function HospitalMap({
     [getCell, editMode]
   );
 
+  const isElevatorCell = hoveredCell && hoveredCell[0] === elevatorPosition[0] && hoveredCell[1] === elevatorPosition[1];
+
   return (
     <div className={className}>
+      {/* 楼层切换 Tab */}
+      {showFloorTabs && onFloorChange && (
+        <div className="flex gap-2 mb-3">
+          {['1F', '2F', '3F'].map((fid) => (
+            <button
+              key={fid}
+              onClick={() => onFloorChange(fid)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                currentFloor === fid
+                  ? 'text-white shadow-lg'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+              style={currentFloor === fid ? { backgroundColor: floorColors[fid] } : {}}
+            >
+              {fid === '1F' ? '🏥 一层' : fid === '2F' ? '🔬 二层' : '🛏️ 三层'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <canvas
         ref={canvasRef}
         onClick={handleClick}
@@ -432,18 +497,20 @@ export default function HospitalMap({
         className="w-full border border-slate-700 rounded-xl shadow-lg overflow-hidden transition-all duration-300"
         style={{ maxHeight: "620px", aspectRatio: `${W}/${H}` }}
       />
+
       {hoveredCell && (
         <div className="mt-2 flex items-center justify-between text-xs text-slate-300 bg-slate-800 border border-slate-700 rounded-lg p-2.5 shadow-inner">
           <div>
             📍 坐标: <span className="font-bold text-white font-mono">({hoveredCell[0]}, {hoveredCell[1]})</span>
             {wallSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && <span className="ml-2 text-slate-400 font-medium">| 🛑 固体墙壁</span>}
             {dynamicSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && <span className="ml-2 text-amber-400 font-medium">| ⚠ 动态障碍区</span>}
-            {!wallSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && !dynamicSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && (
+            {isElevatorCell && <span className="ml-2 text-yellow-400 font-medium">| 🛗 电梯位置</span>}
+            {!wallSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && !dynamicSet.has(`${hoveredCell[0]},${hoveredCell[1]}`) && !isElevatorCell && (
               <span className="ml-2 text-green-400 font-medium">| 🟢 可通行区域</span>
             )}
           </div>
           <div className="text-slate-500">
-            {editMode ? `编辑模式: ${editMode}` : "提示: 点击地图进行交互"}
+            {editMode ? `编辑模式: ${editMode}` : `楼层: ${currentFloor}`}
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@ import { Map, PencilLine, Route, Repeat, Settings } from 'lucide-react'
 const navItems = [
   { path: '/', icon: Map, label: '路径规划总览' },
   { path: '/map-editor', icon: PencilLine, label: '地图编辑' },
-  { path: '/pathplan', icon: Route, label: '路径规划' },
+  { path: '/pathplan', icon: Route, label: '多楼层路径规划' },
   { path: '/replan', icon: Repeat, label: '动态障碍与重规划' },
   { path: '/rules', icon: Settings, label: '规则配置与导出' },
 ]
