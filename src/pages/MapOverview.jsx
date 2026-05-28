@@ -1,97 +1,119 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
-import { pointColors, pointIcons } from "../data/mapData";
+import { PencilLine, Route, Repeat, Download, MapPin, Grid3X3, ShieldAlert, Crosshair, Flag, Ruler, RotateCw } from "lucide-react";
 
 export default function MapOverview() {
-  const { map, robots, routes, bestRoute, rules, validation } = useAppStore();
-  const [showRobots, setShowRobots] = useState(true);
-  const [showLabels, setShowLabels] = useState(true);
+  const { map, routes, bestRoute, validation, logs, replanCount } = useAppStore();
+  const navigate = useNavigate();
 
-  const robotDisplay = showRobots ? robots : [];
+  const startName = "药房";
+  const endName = "消毒供应室";
+
+  const stats = [
+    { label: "地图尺寸", value: `${map.cols}×${map.rows}`, icon: Grid3X3, color: "text-blue-400" },
+    { label: "可通行网格", value: validation.freeCells, icon: MapPin, color: "text-green-400" },
+    { label: "静态障碍", value: validation.wallCells, icon: ShieldAlert, color: "text-slate-400" },
+    { label: "动态障碍", value: map.dynamic.length, icon: ShieldAlert, color: "text-amber-400" },
+    { label: "当前起点", value: startName, icon: Crosshair, color: "text-emerald-400" },
+    { label: "当前终点", value: endName, icon: Flag, color: "text-red-400" },
+    { label: "推荐路径长度", value: bestRoute ? `${bestRoute.length} 步` : "未计算", icon: Ruler, color: "text-purple-400" },
+    { label: "重规划次数", value: replanCount, icon: RotateCw, color: "text-cyan-400" },
+  ];
+
+  const recentLogs = logs.slice(0, 10);
 
   return (
-    <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-100">🗺️ 地图总览</h2>
-      <p className="text-slate-400 text-sm">
-        基于网格的地图系统，{map.cols}×{map.rows} 网格，{validation.freeCells} 个自由格，
-        {Object.keys(map.points).length} 个科室节点，{map.dynamic.length} 个动态障碍。
-      </p>
-
-      {/* Controls */}
-      <div className="flex gap-4 flex-wrap text-slate-300">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showRobots} onChange={() => setShowRobots(!showRobots)} className="accent-blue-500" />
-          显示机器人 ({robots.length}台)
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showLabels} onChange={() => setShowLabels(!showLabels)} className="accent-blue-500" />
-          显示标签
-        </label>
+    <div className="p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-100">路径规划总览</h2>
+          <p className="text-slate-400 text-sm mt-1">
+            医院院内物流场景 · 在线路径规划控制台
+          </p>
+        </div>
       </div>
 
-      {/* Map */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 shadow-lg">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-4 gap-3">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className={`w-4 h-4 ${s.color}`} />
+                <span className="text-xs text-slate-400">{s.label}</span>
+              </div>
+              <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Map Preview */}
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-white">地图预览</h3>
+          <span className="text-xs text-slate-400">
+            {map.cols}×{map.rows} 网格 · {Object.keys(map.points).length} 科室节点
+          </span>
+        </div>
         <HospitalMap
           mapData={map}
-          robots={robotDisplay}
           routes={routes}
           bestRoute={bestRoute}
-          showLabels={showLabels}
+          highlightRoute={bestRoute}
+          showLabels={true}
         />
       </div>
 
-      {/* Points legend */}
+      {/* Action Buttons */}
       <div className="grid grid-cols-4 gap-3">
-        {Object.entries(map.points).map(([name, pos]) => (
-          <div key={name} className="border border-slate-700 rounded p-3 text-sm bg-slate-800" style={{ borderLeftColor: pointColors[name], borderLeftWidth: 4 }}>
-            <div className="font-semibold text-slate-200">
-              {pointIcons[name]} {name}
-            </div>
-            <div className="text-slate-400 text-xs">坐标: ({pos[0]}, {pos[1]})</div>
-          </div>
-        ))}
+        <button
+          onClick={() => navigate("/map-editor")}
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition"
+        >
+          <PencilLine className="w-4 h-4" />
+          编辑地图
+        </button>
+        <button
+          onClick={() => navigate("/pathplan")}
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition"
+        >
+          <Route className="w-4 h-4" />
+          计算路径
+        </button>
+        <button
+          onClick={() => navigate("/replan")}
+          className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition"
+        >
+          <Repeat className="w-4 h-4" />
+          模拟障碍
+        </button>
+        <button
+          onClick={() => navigate("/rules")}
+          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition"
+        >
+          <Download className="w-4 h-4" />
+          导出路径
+        </button>
       </div>
 
-      {/* Robot status */}
-      <div>
-        <h3 className="font-bold mb-2 text-slate-200">🤖 机器人状态</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {robots.map((r) => (
-            <div key={r.id} className="border border-slate-700 rounded p-2 text-sm bg-slate-800">
-              <div className="font-semibold text-slate-200">{r.name}</div>
-              <div className="text-slate-400 text-xs">{r.id}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <span
-                  className={`px-2 py-0.5 rounded text-xs text-white ${
-                    r.status === "running"
-                      ? "bg-green-500"
-                      : r.status === "idle"
-                      ? "bg-orange-500"
-                      : r.status === "charging"
-                      ? "bg-blue-500"
-                      : "bg-red-500"
-                  }`}
-                >
-                  {r.status === "running" ? "运行中" : r.status === "idle" ? "待机" : r.status === "charging" ? "充电中" : "故障"}
-                </span>
-                <span className="text-xs text-slate-400">🔋 {r.battery}%</span>
+      {/* Recent Logs */}
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-white mb-3">最近路径规划日志</h3>
+        {recentLogs.length === 0 ? (
+          <p className="text-slate-500 text-sm">暂无日志记录</p>
+        ) : (
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {recentLogs.map((log, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm">
+                <span className="text-slate-500 font-mono text-xs w-16 shrink-0">{log.time}</span>
+                <span className="text-slate-300">{log.message}</span>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Active rules */}
-      <div>
-        <h3 className="font-bold mb-2 text-slate-200">🚦 生效中的规则</h3>
-        <div className="flex flex-wrap gap-2">
-          {rules.filter((r) => r.enabled).map((rule) => (
-            <span key={rule.id} className="bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs border border-slate-600">
-              {rule.name} (权重: {rule.weight})
-            </span>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

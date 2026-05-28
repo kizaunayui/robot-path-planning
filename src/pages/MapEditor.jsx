@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
+import { Eraser, Plus, AlertTriangle, Dices, Trash2, Save, RotateCcw, CheckCircle, XCircle } from "lucide-react";
 
 const TOOLS = [
-  { id: "wall", icon: "🧱", label: "绘制墙壁" },
-  { id: "dynamic", icon: "⚠️", label: "动态障碍" },
-  { id: "erase", icon: "🗑️", label: "擦除" },
-  { id: "randomDynamic", icon: "🎲", label: "随机动态" },
+  { id: "wall", icon: Plus, label: "绘制墙壁" },
+  { id: "dynamic", icon: AlertTriangle, label: "动态障碍" },
+  { id: "erase", icon: Eraser, label: "擦除" },
 ];
 
 export default function MapEditor() {
@@ -15,7 +15,6 @@ export default function MapEditor() {
   const [resizeCols, setResizeCols] = useState(map.cols);
   const [resizeRows, setResizeRows] = useState(map.rows);
   const [density, setDensity] = useState(16);
-  const [savedMsg, setSavedMsg] = useState("");
 
   const handleCellClick = useCallback(
     (cell) => {
@@ -30,64 +29,64 @@ export default function MapEditor() {
     [tool, updateMap]
   );
 
-  const handleRandomDynamic = () => {
-    updateMap("randomDynamic", 5);
-  };
-
-  const handleSave = () => {
-    localStorage.setItem("pathplan_map", JSON.stringify(map));
-    setSavedMsg("已保存到本地存储");
-    setTimeout(() => setSavedMsg(""), 2000);
-  };
-
-  const handleLoad = () => {
-    try {
-      const data = JSON.parse(localStorage.getItem("pathplan_map"));
-      if (data) {
-        // Triggers re-render through store
-        window.location.reload();
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-100">🗺️ 地图编辑器</h2>
+      <h2 className="text-2xl font-bold text-slate-100">地图编辑</h2>
+      <p className="text-slate-400 text-sm">
+        绘制静态障碍与动态障碍，编辑结果将影响后续路径规划。
+      </p>
 
       {/* Toolbar */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-sm flex items-center gap-2 flex-wrap">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => {
-              setTool(t.id);
-              if (t.id === "randomDynamic") handleRandomDynamic();
-            }}
-            className={`px-3 py-2 rounded text-sm transition ${
-              tool === t.id ? "bg-blue-600 text-white" : "bg-slate-700 hover:bg-slate-200 text-slate-200"
-            }`}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-        <span className="w-px h-6 bg-slate-300 mx-1" />
-        <button onClick={handleSave} className="px-3 py-2 rounded text-sm bg-green-100 hover:bg-green-200 text-green-700">
-          💾 保存
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 flex items-center gap-2 flex-wrap">
+        {TOOLS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTool(t.id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded text-sm transition ${
+                tool === t.id ? "bg-blue-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          );
+        })}
+        <span className="w-px h-6 bg-slate-600 mx-1" />
+        <button
+          onClick={() => updateMap("randomDynamic", 5)}
+          className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-amber-600 hover:bg-amber-700 text-white"
+        >
+          <Dices className="w-4 h-4" />
+          随机动态障碍
         </button>
-        <button onClick={handleLoad} className="px-3 py-2 rounded text-sm bg-blue-100 hover:bg-blue-200 text-blue-700">
-          📂 加载
+        <button
+          onClick={() => updateMap("clearDynamic")}
+          className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-orange-600 hover:bg-orange-700 text-white"
+        >
+          <Trash2 className="w-4 h-4" />
+          清除动态障碍
         </button>
-        <button onClick={resetState} className="px-3 py-2 rounded text-sm bg-red-100 hover:bg-red-200 text-red-700">
-          🔄 恢复默认
+        <button
+          onClick={() => updateMap("clearAll")}
+          className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-red-600 hover:bg-red-700 text-white"
+        >
+          <Trash2 className="w-4 h-4" />
+          清除所有障碍
         </button>
-        {savedMsg && <span className="text-sm text-green-600 font-medium">{savedMsg}</span>}
+        <button
+          onClick={resetState}
+          className="flex items-center gap-2 px-3 py-2 rounded text-sm bg-slate-600 hover:bg-slate-500 text-white"
+        >
+          <RotateCcw className="w-4 h-4" />
+          恢复默认
+        </button>
       </div>
 
       {/* Resize & Random */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-200 mb-3">📐 地图设置</h3>
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+        <h3 className="text-sm font-semibold text-white mb-3">地图设置</h3>
         <div className="grid grid-cols-6 gap-4 items-end">
           <div>
             <label className="text-xs text-slate-400 mb-1 block">列数 (16-60)</label>
@@ -97,7 +96,7 @@ export default function MapEditor() {
               max={60}
               value={resizeCols}
               onChange={(e) => setResizeCols(Number(e.target.value))}
-              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
             />
           </div>
           <div>
@@ -108,14 +107,14 @@ export default function MapEditor() {
               max={40}
               value={resizeRows}
               onChange={(e) => setResizeRows(Number(e.target.value))}
-              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
             />
           </div>
           <button
             onClick={() => resizeMap(resizeCols, resizeRows)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
           >
-            📐 调整尺寸
+            调整尺寸
           </button>
           <div>
             <label className="text-xs text-slate-400 mb-1 block">障碍密度 (0-42%)</label>
@@ -125,14 +124,14 @@ export default function MapEditor() {
               max={42}
               value={density}
               onChange={(e) => setDensity(Number(e.target.value))}
-              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white"
             />
           </div>
           <button
             onClick={() => randomMap(resizeCols, resizeRows, density)}
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm"
           >
-            🎲 随机地图
+            随机地图
           </button>
           <div className="text-xs text-slate-400">
             当前: {map.cols}×{map.rows} | 墙壁: {map.walls.length} | 动态: {map.dynamic.length}
@@ -141,7 +140,7 @@ export default function MapEditor() {
       </div>
 
       {/* Map */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4">
         <HospitalMap
           mapData={map}
           editMode={tool}
@@ -154,7 +153,7 @@ export default function MapEditor() {
       {/* Validation */}
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{validation.freeCells}</div>
+          <div className="text-2xl font-bold text-blue-400">{validation.freeCells}</div>
           <div className="text-xs text-slate-400">自由格</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
@@ -162,18 +161,25 @@ export default function MapEditor() {
           <div className="text-xs text-slate-400">墙壁格</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{validation.dynamicObstacles}</div>
+          <div className="text-2xl font-bold text-amber-400">{validation.dynamicObstacles}</div>
           <div className="text-xs text-slate-400">动态障碍</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{validation.points}</div>
+          <div className="text-2xl font-bold text-green-400">{validation.points}</div>
           <div className="text-xs text-slate-400">科室节点</div>
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
-          <div className={`text-2xl font-bold ${validation.connected ? "text-green-600" : "text-red-600"}`}>
-            {validation.connected ? "✅" : "❌"}
+          <div className="flex items-center justify-center gap-2">
+            {validation.connected ? (
+              <CheckCircle className="w-6 h-6 text-green-400" />
+            ) : (
+              <XCircle className="w-6 h-6 text-red-400" />
+            )}
+            <span className={`text-lg font-bold ${validation.connected ? "text-green-400" : "text-red-400"}`}>
+              {validation.connected ? "可达" : "不可达"}
+            </span>
           </div>
-          <div className="text-xs text-slate-400">连通性</div>
+          <div className="text-xs text-slate-400">起点→终点连通性</div>
         </div>
       </div>
     </div>

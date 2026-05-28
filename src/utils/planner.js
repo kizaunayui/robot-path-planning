@@ -30,7 +30,7 @@ function rebuild(parent, pos) {
 
 // ==================== 移动代价 ====================
 
-export function moveCost(pos, nxt, prev, strategy, rules) {
+export function moveCost(pos, nxt, prev, strategy, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
   let cost = 1.0;
 
   // smooth 策略：转弯惩罚
@@ -47,6 +47,10 @@ export function moveCost(pos, nxt, prev, strategy, rules) {
     cost += 0.15;
   }
 
+  // 货物类型和优先级影响
+  cost *= cargoMultiplier;
+  cost *= priorityMultiplier;
+
   // 规则影响
   for (const rule of rules) {
     if (!rule.enabled) continue;
@@ -58,7 +62,7 @@ export function moveCost(pos, nxt, prev, strategy, rules) {
 
     // 手术区优先通行 (R1) - 手术室附近 [23-27, 2-6]
     if (rule.type === "priority_zone" && nxt[0] >= 23 && nxt[0] <= 27 && nxt[1] >= 2 && nxt[1] <= 6) {
-      cost *= 0.85; // 降低代价 = 提高优先级
+      cost *= 0.85;
     }
 
     // 平稳优先 (R3)
@@ -70,6 +74,16 @@ export function moveCost(pos, nxt, prev, strategy, rules) {
     if (rule.type === "energy" && strategy === "energy") {
       cost *= 0.92;
     }
+
+    // 禁行区 (R5) - 电梯厅周围 [12-16, 8-12]
+    if (rule.type === "no_go" && nxt[0] >= 12 && nxt[0] <= 16 && nxt[1] >= 8 && nxt[1] <= 12) {
+      cost += rule.weight;
+    }
+
+    // 限速区 (R6) - 住院区走廊 [2-6, 14-18]
+    if (rule.type === "speed_limit" && nxt[0] >= 2 && nxt[0] <= 6 && nxt[1] >= 14 && nxt[1] <= 18) {
+      cost *= rule.weight;
+    }
   }
 
   return cost;
@@ -77,7 +91,7 @@ export function moveCost(pos, nxt, prev, strategy, rules) {
 
 // ==================== A* 搜索 ====================
 
-export function astar(start, goal, strategy, mapData, rules) {
+export function astar(start, goal, strategy, mapData, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
   const walls = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
   const dynamic = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
   const blocked = new Set([...walls, ...dynamic]);
@@ -86,14 +100,12 @@ export function astar(start, goal, strategy, mapData, rules) {
   const startKey = `${start[0]},${start[1]}`;
   const goalKey = `${goal[0]},${goal[1]}`;
 
-  // Min-heap via array + sort (small maps, acceptable)
   const openSet = [{ f: heuristic(start, goal), g: 0, pos: start, prev: null, key: startKey }];
   const parent = {};
   const best = { [startKey]: 0 };
   const visited = new Set();
 
   while (openSet.length > 0) {
-    // Pop min f
     openSet.sort((a, b) => a.f - b.f);
     const current = openSet.shift();
     const { g, pos, key } = current;
@@ -109,7 +121,7 @@ export function astar(start, goal, strategy, mapData, rules) {
     for (const nxt of neighbors(pos, cols, rows, blocked)) {
       const nxtKey = `${nxt[0]},${nxt[1]}`;
       const prevPos = current.prev ? current.prev.split(",").map(Number) : null;
-      const ng = g + moveCost(pos, nxt, prevPos, strategy, rules);
+      const ng = g + moveCost(pos, nxt, prevPos, strategy, rules, cargoMultiplier, priorityMultiplier);
       if (ng < (best[nxtKey] ?? 999999)) {
         best[nxtKey] = ng;
         openSet.push({
@@ -165,14 +177,20 @@ export function routeReport(strategy, path, visited) {
 
 // ==================== 路径规划主入口 ====================
 
-export function planRoutes(task, params, mapData, rules) {
+export function planRoutes(task, params, mapData, rules, cargoTypes, priorityLevels) {
   const start = mapData.points[task.start];
   const goal = mapData.points[task.end];
   if (!start || !goal) return { routes: [], bestRoute: null };
 
+  // 货物和优先级影响代价
+  const cargo = (cargoTypes || []).find((c) => c.id === task.cargo);
+  const priority = (priorityLevels || []).find((p) => p.id === task.priority);
+  const cargoMultiplier = cargo ? cargo.costMultiplier : 1;
+  const priorityMultiplier = priority ? priority.costMultiplier : 1;
+
   const routes = [];
   for (const strategy of ["time", "smooth", "energy"]) {
-    const { path, visited } = astar(start, goal, strategy, mapData, rules);
+    const { path, visited } = astar(start, goal, strategy, mapData, rules, cargoMultiplier, priorityMultiplier);
     routes.push(routeReport(strategy, path, visited));
   }
 
@@ -188,12 +206,34 @@ export function validateMap(mapData) {
   const wallSet = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
   const dynamicSet = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
   const freeCells = mapData.cols * mapData.rows - wallSet.size;
+
+  // 连通性检查：BFS 从 (1,1) 出发能到达多少格
+  const blocked = new Set([...wallSet, ...dynamicSet]);
+  const visited = new Set();
+  const queue = [[1, 1]];
+  visited.add("1,1");
+  while (queue.length > 0) {
+    const [x, y] = queue.shift();
+    for (const [nx, ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]) {
+      const key = `${nx},${ny}`;
+      if (nx >= 0 && nx < mapData.cols && ny >= 0 && ny < mapData.rows && !visited.has(key) && !blocked.has(key)) {
+        visited.add(key);
+        queue.push([nx, ny]);
+      }
+    }
+  }
+
+  // 检查所有科室是否可达
+  const pointsReachable = Object.values(mapData.points).every(
+    (p) => visited.has(`${p[0]},${p[1]}`)
+  );
+
   return {
     freeCells,
     wallCells: wallSet.size,
     dynamicObstacles: dynamicSet.size,
     points: Object.keys(mapData.points).length,
-    connected: freeCells > 0,
+    connected: pointsReachable,
   };
 }
 
@@ -217,6 +257,21 @@ export function updateMap(operation, cell, mapData) {
   } else if (operation === "eraseWall" && cell) {
     const key = `${cell[0]},${cell[1]}`;
     newMap.walls = newMap.walls.filter((p) => `${p[0]},${p[1]}` !== key);
+  } else if (operation === "clearDynamic") {
+    newMap.dynamic = [];
+  } else if (operation === "clearAll") {
+    // 保留边界墙和科室
+    const boundarySet = new Set();
+    for (let x = 0; x < newMap.cols; x++) {
+      boundarySet.add(`${x},0`);
+      boundarySet.add(`${x},${newMap.rows - 1}`);
+    }
+    for (let y = 0; y < newMap.rows; y++) {
+      boundarySet.add(`0,${y}`);
+      boundarySet.add(`${newMap.cols - 1},${y}`);
+    }
+    newMap.walls = newMap.walls.filter((p) => boundarySet.has(`${p[0]},${p[1]}`));
+    newMap.dynamic = [];
   } else if (operation === "randomDynamic") {
     const count = typeof cell === "number" ? cell : 5;
     newMap.dynamic = [];
@@ -299,54 +354,5 @@ function defaultPoints(cols, rows) {
     住院区B: [Math.max(5, Math.floor(cols / 2) + 2), rows - 4],
     消毒供应室: [cols - 4, rows - 5],
     电梯厅: [Math.floor(cols / 2), Math.floor(rows / 2)],
-  };
-}
-
-// ==================== 沙盒演练 ====================
-
-export function runSandbox(rounds, mapData, rules, params) {
-  const names = Object.keys(mapData.points);
-  const summary = [];
-
-  for (let i = 0; i < rounds; i++) {
-    // 随机选两个不同点
-    let si = Math.floor(Math.random() * names.length);
-    let ei = Math.floor(Math.random() * names.length);
-    while (ei === si) ei = Math.floor(Math.random() * names.length);
-
-    const startName = names[si];
-    const endName = names[ei];
-
-    const task = { start: startName, end: endName, priority: 1 + Math.floor(Math.random() * 3) };
-    const { bestRoute } = planRoutes(task, params, mapData, rules);
-
-    summary.push({
-      start: startName,
-      end: endName,
-      reachable: !!bestRoute,
-      length: bestRoute ? bestRoute.length : 0,
-      turns: bestRoute ? bestRoute.turns : 0,
-      minutes: bestRoute ? bestRoute.estimatedMinutes : 0,
-      energy: bestRoute ? bestRoute.energy : 0,
-    });
-  }
-
-  const reachable = summary.filter((r) => r.reachable);
-  return {
-    rounds,
-    successRate: Math.round((reachable.length / Math.max(rounds, 1)) * 100) / 100,
-    avgLength:
-      Math.round(
-        (reachable.reduce((s, r) => s + r.length, 0) / Math.max(reachable.length, 1)) * 10
-      ) / 10,
-    avgTurns:
-      Math.round(
-        (reachable.reduce((s, r) => s + r.turns, 0) / Math.max(reachable.length, 1)) * 10
-      ) / 10,
-    avgMinutes:
-      Math.round(
-        (reachable.reduce((s, r) => s + r.minutes, 0) / Math.max(reachable.length, 1)) * 10
-      ) / 10,
-    records: summary,
   };
 }

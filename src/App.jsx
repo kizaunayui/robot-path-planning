@@ -2,20 +2,10 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AppStoreProvider } from './store/AppStore'
 import Layout from './components/Layout'
 import MapOverview from './pages/MapOverview'
-import PathPlan from './pages/PathPlan'
-import Collision from './pages/Collision'
-import NavMesh from './pages/NavMesh'
-import MultiRobot from './pages/MultiRobot'
-import TaskAllocation from './pages/TaskAllocation'
-import CostMap from './pages/CostMap'
-import HISPolicy from './pages/HISPolicy'
-import Charging from './pages/Charging'
-import Diagnostics from './pages/Diagnostics'
 import MapEditor from './pages/MapEditor'
-import TaskDispatch from './pages/TaskDispatch'
-import PathConfig from './pages/PathConfig'
-import TrafficRules from './pages/TrafficRules'
-import SimulationSandbox from './pages/SimulationSandbox'
+import PathPlan from './pages/PathPlan'
+import ReplanPage from './pages/ReplanPage'
+import RulesExport from './pages/RulesExport'
 
 export default function App() {
   return (
@@ -24,20 +14,10 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<MapOverview />} />
-          <Route path="/pathplan" element={<PathPlan />} />
-          <Route path="/collision" element={<Collision />} />
-          <Route path="/navmesh" element={<NavMesh />} />
-          <Route path="/multi-robot" element={<MultiRobot />} />
-          <Route path="/tasks" element={<TaskAllocation />} />
-          <Route path="/costmap" element={<CostMap />} />
-          <Route path="/his" element={<HISPolicy />} />
-          <Route path="/charging" element={<Charging />} />
-          <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/map-editor" element={<MapEditor />} />
-          <Route path="/task-dispatch" element={<TaskDispatch />} />
-          <Route path="/path-config" element={<PathConfig />} />
-          <Route path="/traffic-rules" element={<TrafficRules />} />
-          <Route path="/simulation" element={<SimulationSandbox />} />
+          <Route path="/pathplan" element={<PathPlan />} />
+          <Route path="/replan" element={<ReplanPage />} />
+          <Route path="/rules" element={<RulesExport />} />
         </Routes>
       </Layout>
     </HashRouter>

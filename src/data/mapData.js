@@ -32,12 +32,14 @@ export const defaultMapData = {
   },
 };
 
-// 默认规则
+// 默认规则（6条）
 export const defaultRules = [
   { id: "R1", name: "手术区优先通行", type: "priority_zone", enabled: true, weight: 1.3 },
   { id: "R2", name: "污染区避让", type: "avoid_zone", enabled: true, weight: 2.0 },
   { id: "R3", name: "平稳优先", type: "smooth", enabled: true, weight: 1.2 },
-  { id: "R4", name: "低电量节能路径", type: "energy", enabled: true, weight: 1.1 },
+  { id: "R4", name: "低电量节能", type: "energy", enabled: true, weight: 1.1 },
+  { id: "R5", name: "禁行区", type: "no_go", enabled: false, weight: 99 },
+  { id: "R6", name: "限速区", type: "speed_limit", enabled: false, weight: 1.8 },
 ];
 
 // 默认参数
@@ -46,6 +48,22 @@ export const defaultParams = {
   sensitivity: 2,
   buffer: 1,
 };
+
+// 货物类型影响代价
+export const cargoTypes = [
+  { id: "medicine", name: "药品配送", costMultiplier: 1.0, icon: "💊" },
+  { id: "sample", name: "样本转运", costMultiplier: 1.2, icon: "🧪" },
+  { id: "instrument", name: "器械运输", costMultiplier: 1.1, icon: "🔧" },
+  { id: "waste", name: "医疗废物", costMultiplier: 1.5, icon: "☣️" },
+];
+
+// 优先级影响代价
+export const priorityLevels = [
+  { id: 1, name: "紧急", costMultiplier: 0.7, color: "#ef4444" },
+  { id: 2, name: "高", costMultiplier: 0.85, color: "#f97316" },
+  { id: 3, name: "普通", costMultiplier: 1.0, color: "#3b82f6" },
+  { id: 4, name: "低", costMultiplier: 1.2, color: "#6b7280" },
+];
 
 // 科室颜色
 export const pointColors = {
@@ -82,13 +100,3 @@ export const strategyNames = {
   smooth: "备用路径B-平稳优先",
   energy: "应急路径C-节能优先",
 };
-
-// 机器人初始数据
-export const initialRobots = [
-  { id: "R1", name: "运输机器人1号", pos: [2, 3], status: "idle", battery: 85, speed: 1.2, taskId: null },
-  { id: "R2", name: "运输机器人2号", pos: [14, 10], status: "idle", battery: 92, speed: 1.0, taskId: null },
-  { id: "R3", name: "运输机器人3号", pos: [13, 3], status: "idle", battery: 45, speed: 1.1, taskId: null },
-  { id: "R4", name: "运输机器人4号", pos: [25, 4], status: "charging", battery: 15, speed: 0.8, taskId: null },
-  { id: "R5", name: "运输机器人5号", pos: [17, 16], status: "idle", battery: 78, speed: 1.3, taskId: null },
-  { id: "R6", name: "运输机器人6号", pos: [27, 15], status: "idle", battery: 60, speed: 1.0, taskId: null },
-];

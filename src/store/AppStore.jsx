@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import {
   defaultMapData,
   defaultRules,
   defaultParams,
-  initialRobots,
+  cargoTypes,
+  priorityLevels,
 } from "../data/mapData";
 import {
   planRoutes,
@@ -11,7 +12,6 @@ import {
   updateMap as plannerUpdateMap,
   resizeMap as plannerResizeMap,
   randomMap as plannerRandomMap,
-  runSandbox as plannerRunSandbox,
 } from "../utils/planner";
 
 const AppStoreContext = createContext(null);
@@ -47,17 +47,10 @@ export function AppStoreProvider({ children }) {
   // === 参数 ===
   const [params, setParams] = useState({ ...defaultParams });
 
-  // === 机器人 ===
-  const [robots, setRobots] = useState(initialRobots.map((r) => ({ ...r })));
-
-  // === 活跃任务 ===
-  const [activeTasks, setActiveTasks] = useState([]);
-
-  // === 活跃路径（机器人→路径映射） ===
-  const [activeRoutes, setActiveRoutes] = useState({});
-
-  // === 沙盒结果 ===
-  const [sandbox, setSandbox] = useState(null);
+  // === 重规划相关 ===
+  const [replanCount, setReplanCount] = useState(0);
+  const [replanHistory, setReplanHistory] = useState([]);
+  const [previousRoute, setPreviousRoute] = useState(null);
 
   // === 日志 ===
   const [logs, setLogs] = useState([]);
@@ -65,60 +58,6 @@ export function AppStoreProvider({ children }) {
   const addLog = useCallback((msg) => {
     setLogs((prev) => addLogEntry(prev, msg));
   }, []);
-
-  // === 模拟任务运行与机器人位置更新 Ticker ===
-  useEffect(() => {
-    const activeRunningTasks = activeTasks.filter(t => t.status === "执行中");
-    if (activeRunningTasks.length === 0) return;
-
-    const interval = setInterval(() => {
-      setActiveTasks((prevTasks) => {
-        let updated = false;
-        const nextTasks = prevTasks.map((t) => {
-          if (t.status !== "执行中") return t;
-          const route = activeRoutes[t.id];
-          if (!route || !route.path || route.path.length === 0) {
-            updated = true;
-            return { ...t, status: "已完成", progress: 100 };
-          }
-
-          const currentProgress = t.progress || 0;
-          const totalSteps = route.path.length;
-          // 每次 tick 推进 1 步
-          const currentStep = Math.min(totalSteps - 1, Math.floor((currentProgress / 100) * totalSteps));
-          const nextStep = currentStep + 1;
-          const nextProgress = Math.min(100, Math.round((nextStep / totalSteps) * 100));
-          const nextPos = route.path[Math.min(totalSteps - 1, nextStep)];
-
-          // 更新机器人位置
-          if (t.robotId) {
-            setRobots((prevRobots) =>
-              prevRobots.map((r) =>
-                r.id === t.robotId
-                  ? {
-                      ...r,
-                      pos: nextPos,
-                      battery: Math.max(10, r.battery - 1), // 消耗电量
-                      status: nextProgress >= 100 ? "idle" : "running",
-                    }
-                  : r
-              )
-            );
-          }
-
-          updated = true;
-          if (nextProgress >= 100) {
-            addLog(`🎉 任务已完成：${t.id}`);
-            return { ...t, status: "已完成", progress: 100 };
-          }
-          return { ...t, progress: nextProgress };
-        });
-        return updated ? nextTasks : prevTasks;
-      });
-    }, 1200);
-
-    return () => clearInterval(interval);
-  }, [activeTasks, activeRoutes, addLog]);
 
   // === 地图验证 ===
   const validation = validateMap(map);
@@ -128,7 +67,7 @@ export function AppStoreProvider({ children }) {
     (taskOverride, paramsOverride) => {
       const t = taskOverride || task;
       const p = paramsOverride || params;
-      const result = planRoutes(t, p, map, rules);
+      const result = planRoutes(t, p, map, rules, cargoTypes, priorityLevels);
       setRoutes(result.routes);
       setBestRoute(result.bestRoute);
       addLog(`完成路径计算：${t.start} → ${t.end}`);
@@ -203,57 +142,52 @@ export function AppStoreProvider({ children }) {
     [addLog]
   );
 
-  // === 沙盒演练 ===
-  const doRunSandbox = useCallback(
-    (rounds) => {
-      const result = plannerRunSandbox(rounds || 12, map, rules, params);
-      setSandbox(result);
-      addLog(`完成 ${result.rounds} 轮模拟沙盒演练`);
+  // === 重规划 ===
+  const doReplan = useCallback(
+    (obstacleCells) => {
+      // 保存旧路径
+      if (bestRoute) {
+        setPreviousRoute({ ...bestRoute });
+      }
+
+      // 添加动态障碍
+      const newMap = JSON.parse(JSON.stringify(map));
+      obstacleCells.forEach((cell) => {
+        const key = `${cell[0]},${cell[1]}`;
+        if (!newMap.dynamic.some((p) => `${p[0]},${p[1]}` === key)) {
+          newMap.dynamic.push(cell);
+        }
+      });
+      setMap(newMap);
+      localStorage.setItem("pathplan_map", JSON.stringify(newMap));
+
+      // 重新规划
+      const result = planRoutes(task, params, newMap, rules, cargoTypes, priorityLevels);
+      setRoutes(result.routes);
+      setBestRoute(result.bestRoute);
+
+      const newCount = replanCount + 1;
+      setReplanCount(newCount);
+
+      const historyEntry = {
+        id: `RP${Date.now()}`,
+        time: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+        obstacleCount: obstacleCells.length,
+        oldLength: bestRoute ? bestRoute.length : 0,
+        newLength: result.bestRoute ? result.bestRoute.length : 0,
+        lengthDiff: result.bestRoute && bestRoute ? result.bestRoute.length - bestRoute.length : 0,
+        oldTime: bestRoute ? bestRoute.estimatedMinutes : 0,
+        newTime: result.bestRoute ? result.bestRoute.estimatedMinutes : 0,
+        oldEnergy: bestRoute ? bestRoute.energy : 0,
+        newEnergy: result.bestRoute ? result.bestRoute.energy : 0,
+      };
+      setReplanHistory((prev) => [historyEntry, ...prev].slice(0, 20));
+
+      addLog(`重规划完成（第${newCount}次），新增${obstacleCells.length}个动态障碍`);
       return result;
     },
-    [map, rules, params, addLog]
+    [map, task, params, rules, bestRoute, replanCount, addLog]
   );
-
-  // === 任务派发 ===
-  const doDispatchTask = useCallback(
-    (taskData) => {
-      const newTask = {
-        id: `T${Date.now()}`,
-        ...taskData,
-        status: "执行中",
-        progress: 0,
-        createdAt: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
-      };
-      setActiveTasks((prev) => [...prev, newTask]);
-
-      // 更新机器人状态
-      if (taskData.robotId) {
-        setRobots((prev) =>
-          prev.map((r) =>
-            r.id === taskData.robotId
-              ? { ...r, status: "running", taskId: newTask.id }
-              : r
-          )
-        );
-      }
-
-      // 保存路径
-      if (taskData.route) {
-        setActiveRoutes((prev) => ({ ...prev, [newTask.id]: taskData.route }));
-      }
-
-      addLog(`任务已派发：${newTask.id} → ${taskData.robotId || "未分配"}`);
-      return newTask;
-    },
-    [addLog]
-  );
-
-  // === 更新任务 ===
-  const doUpdateTask = useCallback((taskId, updates) => {
-    setActiveTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
-    );
-  }, []);
 
   // === 恢复默认 ===
   const doResetState = useCallback(() => {
@@ -263,15 +197,12 @@ export function AppStoreProvider({ children }) {
     setBestRoute(null);
     setRules([...defaultRules]);
     setParams({ ...defaultParams });
-    setSandbox(null);
+    setReplanCount(0);
+    setReplanHistory([]);
+    setPreviousRoute(null);
     localStorage.removeItem("pathplan_map");
     addLog("恢复默认地图和规则");
   }, [addLog]);
-
-  // === 更新机器人 ===
-  const doUpdateRobot = useCallback((id, updates) => {
-    setRobots((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
-  }, []);
 
   const value = {
     // 数据
@@ -281,12 +212,13 @@ export function AppStoreProvider({ children }) {
     bestRoute,
     rules,
     params,
-    robots,
-    activeTasks,
-    activeRoutes,
-    sandbox,
     logs,
     validation,
+    replanCount,
+    replanHistory,
+    previousRoute,
+    cargoTypes,
+    priorityLevels,
 
     // 操作
     setTask,
@@ -296,11 +228,8 @@ export function AppStoreProvider({ children }) {
     randomMap: doRandomMap,
     updateRules: doUpdateRules,
     updateParams: doUpdateParams,
-    runSandbox: doRunSandbox,
-    dispatchTask: doDispatchTask,
-    updateTask: doUpdateTask,
+    replan: doReplan,
     resetState: doResetState,
-    updateRobot: doUpdateRobot,
     addLog,
   };
 
