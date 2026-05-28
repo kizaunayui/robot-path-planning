@@ -33,16 +33,16 @@ export default function SimulationSandbox() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">🎮 沙盒演练</h2>
+      <h2 className="text-2xl font-bold text-slate-100">🎮 沙盒演练</h2>
 
       {/* Controls */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center gap-4">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600">演练轮数:</label>
+          <label className="text-sm text-slate-300">演练轮数:</label>
           <select
             value={rounds}
             onChange={(e) => setRounds(Number(e.target.value))}
-            className="border border-slate-300 rounded px-2 py-1.5 text-sm"
+            className="border border-slate-600 rounded px-2 py-1.5 text-sm"
           >
             <option value={6}>6 轮</option>
             <option value={12}>12 轮</option>
@@ -58,47 +58,47 @@ export default function SimulationSandbox() {
           {running ? "⏳ 运行中..." : "▶️ 开始演练"}
         </button>
         {sandbox && (
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-slate-400">
             完成 {sandbox.rounds} 轮 | 成功率 {(sandbox.successRate * 100).toFixed(0)}%
           </span>
         )}
       </div>
 
       {/* Map */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
         <HospitalMap mapData={map} highlightRoute={highlightRoute} />
       </div>
 
       {/* Stats */}
       {sandbox && (
         <div className="grid grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-green-600">{(sandbox.successRate * 100).toFixed(0)}%</div>
-            <div className="text-xs text-slate-500">成功率</div>
+            <div className="text-xs text-slate-400">成功率</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-blue-600">{sandbox.avgLength}</div>
-            <div className="text-xs text-slate-500">平均路径长度</div>
+            <div className="text-xs text-slate-400">平均路径长度</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-orange-600">{sandbox.avgTurns}</div>
-            <div className="text-xs text-slate-500">平均转弯次数</div>
+            <div className="text-xs text-slate-400">平均转弯次数</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-purple-600">{sandbox.avgMinutes}</div>
-            <div className="text-xs text-slate-500">平均耗时(分钟)</div>
+            <div className="text-xs text-slate-400">平均耗时(分钟)</div>
           </div>
         </div>
       )}
 
       {/* Records Table */}
       {sandbox && (
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">📋 演练记录</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">📋 演练记录</h3>
           <div className="max-h-72 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-left text-xs text-slate-500">
+              <thead className="sticky top-0 bg-slate-800">
+                <tr className="border-b text-left text-xs text-slate-400">
                   <th className="pb-2">轮次</th>
                   <th className="pb-2">起点</th>
                   <th className="pb-2">终点</th>
@@ -139,14 +139,14 @@ export default function SimulationSandbox() {
       )}
 
       {/* Logs */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-2">📋 操作日志</h3>
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-200 mb-2">📋 操作日志</h3>
         <div className="max-h-40 overflow-y-auto space-y-1">
           {logs.length === 0 ? (
             <div className="text-slate-400 text-xs">暂无日志</div>
           ) : (
             logs.map((log, i) => (
-              <div key={i} className="text-xs text-slate-600 flex gap-2">
+              <div key={i} className="text-xs text-slate-300 flex gap-2">
                 <span className="text-slate-400 font-mono">{log.time}</span>
                 <span>{log.message}</span>
               </div>

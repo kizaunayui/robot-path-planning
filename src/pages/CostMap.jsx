@@ -26,7 +26,7 @@ export default function CostMap() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">🌡️ 区域代价</h2>
+      <h2 className="text-2xl font-bold text-slate-100">🌡️ 区域代价</h2>
       <p className="text-slate-400 text-sm">基于语义区域的代价映射与策略配置，支持通行策略调整。</p>
 
       <div className="grid grid-cols-4 gap-3">
@@ -49,15 +49,15 @@ export default function CostMap() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">区域策略配置</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">区域策略配置</h3>
           <div className="space-y-2">
             {configs.map((c, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div key={idx} className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded" style={{ backgroundColor: c.color }} />
-                    <span className="text-sm font-medium text-slate-700">{c.area}</span>
+                    <span className="text-sm font-medium text-slate-200">{c.area}</span>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -68,11 +68,11 @@ export default function CostMap() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">策略:</span>
+                  <span className="text-xs text-slate-400">策略:</span>
                   <select
                     value={c.policy}
                     onChange={(e) => updatePolicy(idx, e.target.value)}
-                    className="flex-1 text-xs border border-slate-300 rounded px-2 py-1"
+                    className="flex-1 text-xs border border-slate-600 rounded px-2 py-1"
                   >
                     <option>正常通行</option>
                     <option>减速通行</option>
@@ -83,11 +83,11 @@ export default function CostMap() {
                   </select>
                 </div>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-slate-500">基础</span>
+                  <span className="text-xs text-slate-400">基础</span>
                   <div className="flex-1 h-1.5 bg-slate-200 rounded-full">
                     <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(c.baseCost / 3) * 100}%` }} />
                   </div>
-                  <span className="text-xs text-slate-500">当前</span>
+                  <span className="text-xs text-slate-400">当前</span>
                   <div className="flex-1 h-1.5 bg-slate-200 rounded-full">
                     <div
                       className="h-full rounded-full"
@@ -103,19 +103,19 @@ export default function CostMap() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">地图网格</h3>
-          <div className="text-sm text-slate-600 space-y-1">
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">地图网格</h3>
+          <div className="text-sm text-slate-300 space-y-1">
             <div>网格尺寸: {map.cols} × {map.rows}</div>
             <div>墙壁数量: {map.walls.length}</div>
             <div>动态障碍: {map.dynamic.length}</div>
             <div>科室节点: {Object.keys(map.points).length}</div>
           </div>
           <div className="mt-4">
-            <h4 className="text-xs font-bold text-slate-600 mb-2">生效中的交通规则</h4>
+            <h4 className="text-xs font-bold text-slate-300 mb-2">生效中的交通规则</h4>
             <div className="space-y-1">
               {rules.filter((r) => r.enabled).map((r) => (
-                <div key={r.id} className="text-xs text-slate-600 flex justify-between">
+                <div key={r.id} className="text-xs text-slate-300 flex justify-between">
                   <span>{r.name}</span>
                   <span className="font-mono">权重: {r.weight}</span>
                 </div>

@@ -16,7 +16,7 @@ export default function HISPolicy() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">⚙️ HIS策略</h2>
+      <h2 className="text-2xl font-bold text-slate-100">⚙️ HIS策略</h2>
       <p className="text-slate-400 text-sm">HIS 动态策略配置与货物风险评估。</p>
 
       <div className="grid grid-cols-4 gap-3">
@@ -39,11 +39,11 @@ export default function HISPolicy() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">HIS策略配置</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">HIS策略配置</h3>
           <div className="space-y-2">
             {policies.map((p) => (
-              <div key={p.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div key={p.id} className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span
@@ -68,28 +68,28 @@ export default function HISPolicy() {
                     }`}
                   >
                     <div
-                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-slate-800 transition-transform ${
                         p.status === "active" ? "translate-x-5" : "translate-x-0.5"
                       }`}
                     />
                   </button>
                 </div>
-                <div className="text-sm text-slate-700 mb-1">{p.trigger}</div>
-                <div className="text-xs text-slate-500">→ {p.action}</div>
+                <div className="text-sm text-slate-200 mb-1">{p.trigger}</div>
+                <div className="text-xs text-slate-400">→ {p.action}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">货物风险评估</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">货物风险评估</h3>
           <div className="space-y-2">
             {cargoRisks.map((cargo, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div key={idx} className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{cargo.icon}</span>
-                    <span className="text-sm font-medium text-slate-700">{cargo.type}</span>
+                    <span className="text-sm font-medium text-slate-200">{cargo.type}</span>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -107,7 +107,7 @@ export default function HISPolicy() {
                 </div>
                 <div className="space-y-1">
                   {cargo.constraints.map((c, i) => (
-                    <div key={i} className="text-xs text-slate-500">• {c}</div>
+                    <div key={i} className="text-xs text-slate-400">• {c}</div>
                   ))}
                 </div>
                 <div className="mt-2 h-1.5 bg-slate-200 rounded-full">

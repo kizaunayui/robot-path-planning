@@ -54,7 +54,7 @@ export default function Collision() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">⚠️ 碰撞预警</h2>
+      <h2 className="text-2xl font-bold text-slate-100">⚠️ 碰撞预警</h2>
       <p className="text-slate-400 text-sm">
         实时监测机器人间碰撞风险，支持预警管理和冲突解决。
       </p>
@@ -98,7 +98,7 @@ export default function Collision() {
               <button onClick={() => handleResolve(activeAlert.id)} className="px-3 py-1 rounded text-xs bg-green-600 text-white hover:bg-green-700">
                 ✅ 已处理
               </button>
-              <button onClick={() => setActiveAlert(null)} className="px-3 py-1 rounded text-xs bg-slate-200 text-slate-700 hover:bg-slate-300">
+              <button onClick={() => setActiveAlert(null)} className="px-3 py-1 rounded text-xs bg-slate-200 text-slate-200 hover:bg-slate-300">
                 忽略
               </button>
             </div>
@@ -108,21 +108,21 @@ export default function Collision() {
 
       <div className="flex gap-4 items-start">
         {/* Map */}
-        <div className="flex-1 bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+        <div className="flex-1 bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-700">地图视图</h3>
+            <h3 className="text-sm font-bold text-slate-200">地图视图</h3>
             <button onClick={handleSimulateAlert} className="px-3 py-1.5 rounded text-xs bg-yellow-500 text-white hover:bg-yellow-600">
               ⚠️ 模拟预警
             </button>
           </div>
-          <div className="text-sm text-slate-600 space-y-1">
+          <div className="text-sm text-slate-300 space-y-1">
             <div>地图: {map.cols}×{map.rows} | 机器人: {robots.length}台</div>
             <div>墙壁: {map.walls.length} | 动态障碍: {map.dynamic.length}</div>
           </div>
 
           {/* DWA visualization */}
-          <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <h4 className="text-xs font-bold text-slate-600 mb-2">DWA 采样空间</h4>
+          <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+            <h4 className="text-xs font-bold text-slate-300 mb-2">DWA 采样空间</h4>
             <div className="h-32 relative flex items-center justify-center">
               <div className="w-24 h-24 relative">
                 {Array.from({ length: 20 }, (_, i) => {
@@ -142,7 +142,7 @@ export default function Collision() {
                 })}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full" />
               </div>
-              <div className="ml-4 text-xs text-slate-500 space-y-1">
+              <div className="ml-4 text-xs text-slate-400 space-y-1">
                 <div>🟢 可行采样点</div>
                 <div>🔴 碰撞采样点</div>
               </div>
@@ -151,14 +151,14 @@ export default function Collision() {
         </div>
 
         {/* Alert list */}
-        <div className="w-96 bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">预警记录 ({alerts.length})</h3>
+        <div className="w-96 bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">预警记录 ({alerts.length})</h3>
           <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
             {alerts.map((alert) => (
               <div
                 key={alert.id}
                 className={`p-2 rounded-lg cursor-pointer transition-all ${
-                  alert.handled ? "bg-slate-50 opacity-60" : "bg-white border border-slate-200 hover:bg-slate-50"
+                  alert.handled ? "bg-slate-800 opacity-60" : "bg-slate-800 border border-slate-700 hover:bg-slate-800"
                 }`}
                 onClick={() => !alert.handled && setActiveAlert(alert)}
               >
@@ -173,8 +173,8 @@ export default function Collision() {
                     {alert.handled && <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">已处理</span>}
                   </div>
                 </div>
-                <div className="text-xs text-slate-700">{alert.type} - {alert.location}</div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-200">{alert.type} - {alert.location}</div>
+                <div className="text-xs text-slate-400">
                   {alert.robot} & {alert.other} · 距离 {alert.distance}m
                 </div>
                 {!alert.handled && (

@@ -25,7 +25,7 @@ export default function TaskAllocation() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">📋 任务分配</h2>
+      <h2 className="text-2xl font-bold text-slate-100">📋 任务分配</h2>
       <p className="text-slate-400 text-sm">任务队列管理与机器人匹配，支持拖拽排序。</p>
 
       <div className="grid grid-cols-4 gap-3">
@@ -49,9 +49,9 @@ export default function TaskAllocation() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Task list */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-700">任务队列（拖拽排序）</h3>
+            <h3 className="text-sm font-bold text-slate-200">任务队列（拖拽排序）</h3>
             <button
               onClick={() => setShowAssignments(true)}
               className="px-3 py-1.5 rounded text-xs bg-green-600 text-white hover:bg-green-700"
@@ -67,7 +67,7 @@ export default function TaskAllocation() {
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 cursor-grab hover:bg-slate-100 transition-colors ${
+                className={`flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700 cursor-grab hover:bg-slate-700 transition-colors ${
                   dragIdx === idx ? "opacity-50" : ""
                 }`}
               >
@@ -75,7 +75,7 @@ export default function TaskAllocation() {
                 <span className="text-slate-400">⠿</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-slate-700">{task.id}</span>
+                    <span className="text-sm font-medium text-slate-200">{task.id}</span>
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium ${
                         task.priority === "critical"
@@ -88,13 +88,13 @@ export default function TaskAllocation() {
                       {priorityLabels[task.priority]}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-400">
                     {task.from} → {task.to} · {task.cargo} · {task.weight}kg
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-slate-400">截止</div>
-                  <div className="text-sm font-mono text-slate-700">{task.deadline}</div>
+                  <div className="text-sm font-mono text-slate-200">{task.deadline}</div>
                 </div>
               </div>
             ))}
@@ -102,13 +102,13 @@ export default function TaskAllocation() {
         </div>
 
         {/* Match results */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">匹配结果</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">匹配结果</h3>
           {showAssignments ? (
             <div className="space-y-2">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-slate-500 border-b border-slate-200">
+                  <tr className="text-slate-400 border-b border-slate-700">
                     <th className="py-2 text-left">任务</th>
                     <th className="py-2 text-left">机器人</th>
                     <th className="py-2 text-right">评分</th>
@@ -118,16 +118,16 @@ export default function TaskAllocation() {
                   {taskAssignments.map((a, i) => {
                     const robot = robots.find((r) => r.id === a.robotId);
                     return (
-                      <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
+                      <tr key={i} className="border-b border-slate-100 hover:bg-slate-800">
                         <td className="py-2">
-                          <div className="font-medium text-slate-700">{a.taskId}</div>
+                          <div className="font-medium text-slate-200">{a.taskId}</div>
                         </td>
                         <td className="py-2">
-                          <div className="text-slate-700">{a.robotId}</div>
+                          <div className="text-slate-200">{a.robotId}</div>
                           <div className="text-slate-400">{robot?.name?.substring(0, 8)}</div>
                         </td>
                         <td className="py-2 text-right">
-                          <div className="font-mono text-slate-700">{a.score}</div>
+                          <div className="font-mono text-slate-200">{a.score}</div>
                           <div className="text-slate-400 truncate max-w-24" title={a.reason}>
                             {a.reason.substring(0, 10)}...
                           </div>
@@ -137,9 +137,9 @@ export default function TaskAllocation() {
                   })}
                 </tbody>
               </table>
-              <div className="pt-2 border-t border-slate-200">
+              <div className="pt-2 border-t border-slate-700">
                 {taskAssignments.slice(0, 3).map((a, i) => (
-                  <div key={i} className="text-xs text-slate-500 mb-1">
+                  <div key={i} className="text-xs text-slate-400 mb-1">
                     <span className="text-blue-600">{a.taskId}→{a.robotId}:</span> {a.reason}
                   </div>
                 ))}

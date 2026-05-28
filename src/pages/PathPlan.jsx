@@ -30,17 +30,17 @@ export default function PathPlan() {
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">📐 路径规划</h2>
+      <h2 className="text-2xl font-bold text-slate-100">📐 路径规划</h2>
 
       {/* Controls */}
-      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-5 shadow-sm">
         <div className="grid grid-cols-5 gap-4 items-end">
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">起点</label>
+            <label className="text-xs text-slate-400 mb-1 block">起点</label>
             <select
               value={task.start}
               onChange={(e) => setTask({ ...task, start: e.target.value })}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               {pointNames.map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -48,11 +48,11 @@ export default function PathPlan() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">终点</label>
+            <label className="text-xs text-slate-400 mb-1 block">终点</label>
             <select
               value={task.end}
               onChange={(e) => setTask({ ...task, end: e.target.value })}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               {pointNames.map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -60,11 +60,11 @@ export default function PathPlan() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">策略</label>
+            <label className="text-xs text-slate-400 mb-1 block">策略</label>
             <select
               value={params.strategy}
               onChange={(e) => updateParams({ strategy: e.target.value })}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               <option value="time">时间优先</option>
               <option value="smooth">平稳优先</option>
@@ -72,7 +72,7 @@ export default function PathPlan() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">灵敏度</label>
+            <label className="text-xs text-slate-400 mb-1 block">灵敏度</label>
             <input
               type="range"
               min={1}
@@ -81,7 +81,7 @@ export default function PathPlan() {
               onChange={(e) => updateParams({ sensitivity: Number(e.target.value) })}
               className="w-full accent-blue-500"
             />
-            <div className="text-xs text-center text-slate-500">{params.sensitivity}</div>
+            <div className="text-xs text-center text-slate-400">{params.sensitivity}</div>
           </div>
           <button
             onClick={handlePlan}
@@ -93,7 +93,7 @@ export default function PathPlan() {
       </div>
 
       {/* Map with routes */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
         <HospitalMap
           mapData={map}
           routes={routes}
@@ -114,8 +114,8 @@ export default function PathPlan() {
               <div
                 key={route.strategy}
                 onClick={() => handleSelectRoute(route)}
-                className={`cursor-pointer bg-white border-2 rounded-lg p-4 shadow-sm transition ${
-                  isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                className={`cursor-pointer bg-slate-800 border-2 rounded-lg p-4 shadow-sm transition ${
+                  isSelected ? "border-blue-500 bg-blue-50" : "border-slate-700 hover:border-slate-600"
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -126,7 +126,7 @@ export default function PathPlan() {
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">最优</span>
                   )}
                 </div>
-                <div className="space-y-1 text-xs text-slate-600">
+                <div className="space-y-1 text-xs text-slate-300">
                   <div className="flex justify-between">
                     <span>可达性</span>
                     <span className={route.reachable ? "text-green-600" : "text-red-600"}>
@@ -163,8 +163,8 @@ export default function PathPlan() {
 
       {/* Path details */}
       {selectedRoute?.reachable && (
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-2">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-2">
             📍 路径节点序列 — {selectedRoute.name}
           </h3>
           <div className="flex flex-wrap gap-1">
@@ -178,7 +178,7 @@ export default function PathPlan() {
                     className={`px-2 py-1 rounded text-xs ${
                       pointName
                         ? "bg-blue-100 text-blue-700 font-bold"
-                        : "bg-slate-100 text-slate-600"
+                        : "bg-slate-700 text-slate-300"
                     }`}
                   >
                     {pointName || `(${cell[0]},${cell[1]})`}
@@ -192,11 +192,11 @@ export default function PathPlan() {
       )}
 
       {/* Active rules */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-2">🚦 生效规则</h3>
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-200 mb-2">🚦 生效规则</h3>
         <div className="flex flex-wrap gap-2">
           {rules.filter((r) => r.enabled).map((rule) => (
-            <span key={rule.id} className="bg-slate-100 text-slate-700 px-3 py-1 rounded text-xs">
+            <span key={rule.id} className="bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs">
               {rule.name} (权重: {rule.weight})
             </span>
           ))}

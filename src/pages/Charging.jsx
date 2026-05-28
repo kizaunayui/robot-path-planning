@@ -40,7 +40,7 @@ export default function Charging() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">🔋 充电管理</h2>
+      <h2 className="text-2xl font-bold text-slate-100">🔋 充电管理</h2>
       <p className="text-slate-400 text-sm">机器人电量监控与充电桩调度。</p>
 
       <div className="grid grid-cols-4 gap-3">
@@ -64,11 +64,11 @@ export default function Charging() {
 
       <div className="grid grid-cols-2 gap-4">
         {/* Robot battery gauges */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">机器人电量仪表盘</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">机器人电量仪表盘</h3>
           <div className="grid grid-cols-2 gap-3">
             {robots.map((r) => (
-              <div key={r.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div key={r.id} className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                 <div className="flex items-center gap-2 mb-3">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -76,7 +76,7 @@ export default function Charging() {
                       backgroundColor: r.status === "running" ? "#4caf50" : r.status === "charging" ? "#ffc107" : "#9e9e9e",
                     }}
                   />
-                  <span className="text-sm font-medium text-slate-700">{r.name}</span>
+                  <span className="text-sm font-medium text-slate-200">{r.name}</span>
                 </div>
                 <div className="flex items-center justify-center mb-2">
                   <div className="relative w-20 h-20">
@@ -94,7 +94,7 @@ export default function Charging() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-slate-700">{r.battery}%</span>
+                      <span className="text-lg font-bold text-slate-200">{r.battery}%</span>
                     </div>
                   </div>
                 </div>
@@ -128,15 +128,15 @@ export default function Charging() {
 
         {/* Charging stations */}
         <div className="space-y-3">
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 mb-3">充电桩状态</h3>
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-200 mb-3">充电桩状态</h3>
             <div className="space-y-2">
               {stations.map((s) => (
-                <div key={s.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div key={s.id} className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <div className="text-sm font-medium text-slate-700">🔌 {s.name}</div>
-                      <div className="text-xs text-slate-500">{s.location}</div>
+                      <div className="text-sm font-medium text-slate-200">🔌 {s.name}</div>
+                      <div className="text-xs text-slate-400">{s.location}</div>
                     </div>
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -150,7 +150,7 @@ export default function Charging() {
                       {s.status === "available" ? "空闲" : s.status === "occupied" ? "占用" : "故障"}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-400">
                     功率: {s.power}W {s.robotId && `| 机器人: ${s.robotId}`}
                   </div>
                 </div>
@@ -158,15 +158,15 @@ export default function Charging() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 mb-3">智能充电建议</h3>
+          <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-200 mb-3">智能充电建议</h3>
             <div className="space-y-2">
               {robots
                 .filter((r) => r.battery < 50 && r.status !== "charging")
                 .sort((a, b) => a.battery - b.battery)
                 .map((r) => (
                   <div key={r.id} className="p-2 bg-red-50 rounded-lg flex items-center justify-between border border-red-200">
-                    <span className="text-xs text-slate-700">{r.name}</span>
+                    <span className="text-xs text-slate-200">{r.name}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-red-600 font-medium">{r.battery}%</span>
                       <button

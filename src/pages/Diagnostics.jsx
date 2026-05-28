@@ -45,7 +45,7 @@ export default function Diagnostics() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-slate-800">📍 诊断</h2>
+      <h2 className="text-2xl font-bold text-slate-100">📍 诊断</h2>
       <p className="text-slate-400 text-sm">系统诊断日志与地图状态监控，实时显示定位置信度和传感器状态。</p>
 
       {/* Stats */}
@@ -86,12 +86,12 @@ export default function Diagnostics() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Map */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-2">🗺️ 地图状态</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-2">🗺️ 地图状态</h3>
           <HospitalMap mapData={map} robots={robots} />
           {/* Confidence bar */}
-          <div className="mt-2 p-2 bg-slate-100 rounded-lg flex items-center gap-3">
-            <span className="text-xs text-slate-500">定位置信度:</span>
+          <div className="mt-2 p-2 bg-slate-700 rounded-lg flex items-center gap-3">
+            <span className="text-xs text-slate-400">定位置信度:</span>
             <div className="flex-1 h-2 bg-slate-200 rounded-full">
               <div
                 className="h-full rounded-full transition-all duration-500"
@@ -101,13 +101,13 @@ export default function Diagnostics() {
                 }}
               />
             </div>
-            <span className="text-sm text-slate-700 font-mono">{confidence.toFixed(1)}%</span>
+            <span className="text-sm text-slate-200 font-mono">{confidence.toFixed(1)}%</span>
           </div>
         </div>
 
         {/* Diagnostic logs */}
-        <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-2">📋 诊断日志</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-2">📋 诊断日志</h3>
           <div className="space-y-1 max-h-96 overflow-y-auto">
             {diagLogs.length === 0 ? (
               <div className="text-slate-400 text-sm">等待日志...</div>
@@ -120,7 +120,7 @@ export default function Diagnostics() {
                       ? "bg-red-50"
                       : log.level === "warning"
                       ? "bg-yellow-50"
-                      : "bg-slate-50"
+                      : "bg-slate-800"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -138,9 +138,9 @@ export default function Diagnostics() {
                         {levelLabels[log.level]}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500">{log.robot}</span>
+                    <span className="text-xs text-slate-400">{log.robot}</span>
                   </div>
-                  <div className="text-xs text-slate-700">{log.message}</div>
+                  <div className="text-xs text-slate-200">{log.message}</div>
                 </div>
               ))
             )}
@@ -149,13 +149,13 @@ export default function Diagnostics() {
       </div>
 
       {/* Robot diagnostics */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-3">🤖 机器人诊断</h3>
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-200 mb-3">🤖 机器人诊断</h3>
         <div className="grid grid-cols-3 gap-3">
           {robots.map((r) => (
-            <div key={r.id} className="border border-slate-200 rounded-lg p-3">
+            <div key={r.id} className="border border-slate-700 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-sm text-slate-700">{r.name}</span>
+                <span className="font-medium text-sm text-slate-200">{r.name}</span>
                 <span
                   className={`px-2 py-0.5 rounded text-xs text-white ${
                     r.status === "running" ? "bg-green-500" : r.status === "idle" ? "bg-orange-500" : "bg-blue-500"
@@ -164,7 +164,7 @@ export default function Diagnostics() {
                   {r.status === "running" ? "运行中" : r.status === "idle" ? "待机" : "充电中"}
                 </span>
               </div>
-              <div className="space-y-1 text-xs text-slate-600">
+              <div className="space-y-1 text-xs text-slate-300">
                 <div className="flex justify-between">
                   <span>电量</span>
                   <div className="flex items-center gap-1">

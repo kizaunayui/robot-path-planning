@@ -47,18 +47,18 @@ export default function TaskDispatch() {
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">📦 任务派发</h2>
+      <h2 className="text-2xl font-bold text-slate-100">📦 任务派发</h2>
 
       {/* Task Form */}
-      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-3">创建任务</h3>
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-200 mb-3">创建任务</h3>
         <div className="grid grid-cols-6 gap-4 items-end">
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">起点</label>
+            <label className="text-xs text-slate-400 mb-1 block">起点</label>
             <select
               value={task.start}
               onChange={(e) => setTask({ ...task, start: e.target.value })}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               {pointNames.map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -66,11 +66,11 @@ export default function TaskDispatch() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">终点</label>
+            <label className="text-xs text-slate-400 mb-1 block">终点</label>
             <select
               value={task.end}
               onChange={(e) => setTask({ ...task, end: e.target.value })}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               {pointNames.map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -78,11 +78,11 @@ export default function TaskDispatch() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">货物类型</label>
+            <label className="text-xs text-slate-400 mb-1 block">货物类型</label>
             <select
               value={cargo}
               onChange={(e) => setCargo(e.target.value)}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               <option>药品</option>
               <option>血液样本</option>
@@ -92,11 +92,11 @@ export default function TaskDispatch() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">优先级</label>
+            <label className="text-xs text-slate-400 mb-1 block">优先级</label>
             <select
               value={priority}
               onChange={(e) => setPriority(Number(e.target.value))}
-              className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-600 rounded px-3 py-2 text-sm"
             >
               <option value={1}>低</option>
               <option value={2}>普通</option>
@@ -115,7 +115,7 @@ export default function TaskDispatch() {
       </div>
 
       {/* Map */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-4 shadow-sm">
         <HospitalMap
           mapData={map}
           routes={routes}
@@ -133,14 +133,14 @@ export default function TaskDispatch() {
               <div
                 key={route.strategy}
                 onClick={() => route.reachable && setSelectedStrategy(route.strategy)}
-                className={`cursor-pointer bg-white border-2 rounded-lg p-4 shadow-sm transition ${
-                  isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                className={`cursor-pointer bg-slate-800 border-2 rounded-lg p-4 shadow-sm transition ${
+                  isSelected ? "border-blue-500 bg-blue-50" : "border-slate-700 hover:border-slate-600"
                 } ${!route.reachable ? "opacity-50" : ""}`}
               >
                 <div className="text-sm font-bold mb-2" style={{ color }}>
                   {route.name}
                 </div>
-                <div className="space-y-1 text-xs text-slate-600">
+                <div className="space-y-1 text-xs text-slate-300">
                   <div>长度: {route.length} 步</div>
                   <div>转弯: {route.turns} 次</div>
                   <div>时间: {route.estimatedMinutes} 分钟</div>
@@ -156,8 +156,8 @@ export default function TaskDispatch() {
 
       {/* Robot Selection & Dispatch */}
       {routes.some((r) => r.reachable) && (
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">选择机器人 (空闲且电量 &gt; 30%)</h3>
+        <div className="bg-slate-800 rounded-lg border border-slate-700 p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-200 mb-3">选择机器人 (空闲且电量 &gt; 30%)</h3>
           <div className="grid grid-cols-4 gap-3 mb-4">
             {availableRobots.length === 0 ? (
               <div className="col-span-4 text-slate-400 text-sm">暂无可用机器人</div>
@@ -167,11 +167,11 @@ export default function TaskDispatch() {
                   key={r.id}
                   onClick={() => setSelectedRobot(r.id)}
                   className={`cursor-pointer border-2 rounded-lg p-3 transition ${
-                    selectedRobot === r.id ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                    selectedRobot === r.id ? "border-blue-500 bg-blue-50" : "border-slate-700 hover:border-slate-600"
                   }`}
                 >
-                  <div className="text-sm font-medium text-slate-700">{r.name}</div>
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-sm font-medium text-slate-200">{r.name}</div>
+                  <div className="text-xs text-slate-400 mt-1">
                     电量: {r.battery}% | 速度: {r.speed}m/s
                   </div>
                   <div className="text-xs text-slate-400">位置: ({r.pos[0]}, {r.pos[1]})</div>
@@ -190,14 +190,14 @@ export default function TaskDispatch() {
       )}
 
       {/* Active Tasks */}
-      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-700 mb-3">📋 当前任务列表 ({activeTasks.length})</h3>
+      <div className="bg-slate-800 rounded-lg border border-slate-700 p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-200 mb-3">📋 当前任务列表 ({activeTasks.length})</h3>
         {activeTasks.length === 0 ? (
           <div className="text-slate-400 text-sm">暂无活跃任务</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-xs text-slate-500">
+              <tr className="border-b text-left text-xs text-slate-400">
                 <th className="pb-2">任务ID</th>
                 <th className="pb-2">起点</th>
                 <th className="pb-2">终点</th>
