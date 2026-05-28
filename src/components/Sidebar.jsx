@@ -11,13 +11,13 @@ const navItems = [
 
 export default function Sidebar() {
   return (
-    <aside className="w-[220px] min-h-screen bg-slate-900 border-r border-slate-700 flex flex-col">
-      <div className="px-4 py-5 border-b border-slate-700">
+    <aside className="w-[220px] min-h-screen bg-slate-900 border-r border-slate-700/60 flex flex-col">
+      <div className="px-4 py-5 border-b border-slate-700/60">
         <h1 className="text-lg font-bold text-white flex items-center gap-2">
-          <Route className="w-6 h-6 text-blue-400" />
-          <span>路径规划系统</span>
+          <Route size={22} className="text-blue-400" />
+          <span>在线路径规划软件</span>
         </h1>
-        <p className="text-xs text-slate-400 mt-1">机器人在线实时路径规划</p>
+        <p className="text-xs text-slate-500 mt-1">机器人在线实时路径规划</p>
       </div>
       <nav className="flex-1 py-2 overflow-y-auto">
         {navItems.map(item => {
@@ -30,19 +30,19 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   isActive
-                    ? 'bg-blue-600/20 text-blue-400 border-r-2 border-blue-400'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-blue-600/15 text-blue-400 border-r-2 border-blue-400'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`
               }
             >
-              <Icon className="w-5 h-5" />
+              <Icon size={18} />
               <span>{item.label}</span>
             </NavLink>
           )
         })}
       </nav>
-      <div className="px-4 py-3 border-t border-slate-700">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className="px-4 py-3 border-t border-slate-700/60">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span>系统运行中</span>
         </div>

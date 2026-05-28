@@ -483,7 +483,7 @@ export default function HospitalMap({
               }`}
               style={currentFloor === fid ? { backgroundColor: floorColors[fid] } : {}}
             >
-              {fid === '1F' ? '🏥 一层' : fid === '2F' ? '🔬 二层' : '🛏️ 三层'}
+              {fid} {fid === '1F' ? '一层' : fid === '2F' ? '二层' : '三层'}
             </button>
           ))}
         </div>

@@ -1,78 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --sidebar-width: 240px;
+  color-scheme: dark;
 }
 
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f172a;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #0f172a;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #020617;
   color: #e2e8f0;
-  overflow: hidden;
 }
 
-#root {
-  width: 100vw;
-  height: 100vh;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #64748b; }
-
-/* Canvas container */
-.canvas-container {
-  position: relative;
-  display: inline-block;
-}
-
-/* Animations */
-@keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-
-@keyframes slide-in {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.animate-slide-in {
-  animation: slide-in 0.3s ease-out;
-}
-
-/* Glow effects */
-.glow-green { box-shadow: 0 0 12px rgba(34, 197, 94, 0.4); }
-.glow-red { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
-.glow-blue { box-shadow: 0 0 12px rgba(59, 130, 246, 0.4); }
-.glow-yellow { box-shadow: 0 0 12px rgba(234, 179, 8, 0.4); }
-
-/* Table cell overflow */
-table th, table td {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-table th {
-  white-space: nowrap;
-}
-
-/* Toast animation */
-@keyframes toast-in {
-  from { transform: translateY(-20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-toast {
-  animation: toast-in 0.3s ease-out;
+canvas {
+  image-rendering: auto;
 }
