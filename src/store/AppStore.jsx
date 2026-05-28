@@ -173,6 +173,8 @@ export function AppStoreProvider({ children }) {
         newTime: result.bestRoute ? result.bestRoute.estimatedMinutes : 0,
         oldEnergy: bestRoute ? bestRoute.energy : 0,
         newEnergy: result.bestRoute ? result.bestRoute.energy : 0,
+        oldElevatorCount: bestRoute ? (bestRoute.elevatorCount || 0) : 0,
+        newElevatorCount: result.bestRoute ? (result.bestRoute.elevatorCount || 0) : 0,
       };
       setReplanHistory((prev) => [historyEntry, ...prev].slice(0, 20));
 

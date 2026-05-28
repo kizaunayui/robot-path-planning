@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
 import { Panel, MetricCompare, LogList } from "../components/ui";
-import { Repeat, AlertTriangle, RotateCcw, Clock, Battery, Ruler, Zap } from "lucide-react";
+import { Repeat, AlertTriangle, RotateCcw, Clock, Battery, Ruler, Zap, Building2, MapPin } from "lucide-react";
 
 export default function ReplanPage() {
   const {
@@ -14,11 +14,12 @@ export default function ReplanPage() {
   const [showPrevious, setShowPrevious] = useState(false);
   const [obstacleCount, setObstacleCount] = useState(3);
   const [comparing, setComparing] = useState(false);
+  const [blockInfo, setBlockInfo] = useState(null);
 
   const generateObstaclesOnPath = useCallback(() => {
     if (!bestRoute || !bestRoute.path || bestRoute.path.length < 5) {
       addLog("请先计算路径，再模拟动态障碍");
-      return [];
+      return { obstacles: [], blockedNodes: [] };
     }
     const path = bestRoute.path;
     const floorNodes = path.filter((p) => {
@@ -27,9 +28,10 @@ export default function ReplanPage() {
     });
     if (floorNodes.length < 3) {
       addLog("当前楼层路径太短，无法生成障碍");
-      return [];
+      return { obstacles: [], blockedNodes: [] };
     }
     const obstacles = [];
+    const blockedNodes = [];
     const startIdx = Math.floor(floorNodes.length * 0.2);
     const endIdx = Math.floor(floorNodes.length * 0.8);
     const used = new Set();
@@ -40,14 +42,22 @@ export default function ReplanPage() {
       } while (used.has(idx));
       used.add(idx);
       const node = floorNodes[idx];
-      obstacles.push(node.pos || node);
+      const pos = node.pos || node;
+      obstacles.push(pos);
+      blockedNodes.push({ floor: currentFloor, pos });
     }
-    return obstacles;
+    return { obstacles, blockedNodes };
   }, [bestRoute, obstacleCount, addLog, currentFloor]);
 
   const handleSimulateObstacle = () => {
-    const obstacles = generateObstaclesOnPath();
+    const { obstacles, blockedNodes } = generateObstaclesOnPath();
     if (obstacles.length === 0) return;
+    setBlockInfo({
+      floor: currentFloor,
+      obstacles,
+      blockedNodes,
+      message: `旧路径在 ${currentFloor} (${obstacles.map(o => o.join(", ")).join("), (")}) 节点被动态障碍阻断`,
+    });
     setComparing(true);
     setShowPrevious(true);
     replan(obstacles);
@@ -129,6 +139,46 @@ export default function ReplanPage() {
         </div>
       </div>
 
+      {/* Block info panel */}
+      {blockInfo && (
+        <Panel title="阻断信息" className="border-amber-500/40">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <span className="text-sm font-bold text-amber-300">路径阻断已检测</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div>
+                <div className="text-slate-500 mb-1">阻断楼层</div>
+                <span className="px-2 py-1 rounded font-bold text-white" style={{ backgroundColor: blockInfo.floor === '1F' ? '#3b82f6' : blockInfo.floor === '2F' ? '#10b981' : '#f59e0b' }}>
+                  {blockInfo.floor}
+                </span>
+              </div>
+              <div>
+                <div className="text-slate-500 mb-1">新增障碍坐标</div>
+                <div className="text-amber-400 font-mono">
+                  {blockInfo.obstacles.map((o, i) => `(${o[0]}, ${o[1]}`).join('), ')}{')'}
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-500 mb-1">阻断节点数</div>
+                <div className="text-red-400 font-bold">{blockInfo.blockedNodes.length} 个</div>
+              </div>
+            </div>
+            <div className="bg-slate-800/60 rounded p-2 text-xs text-slate-300">
+              <MapPin className="w-3 h-3 inline text-amber-400 mr-1" />
+              {blockInfo.message}
+            </div>
+            <button
+              onClick={() => setBlockInfo(null)}
+              className="text-xs text-slate-500 hover:text-white"
+            >
+              清除阻断信息
+            </button>
+          </div>
+        </Panel>
+      )}
+
       {/* Comparison indicator */}
       {comparing && previousRoute && bestRoute && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
@@ -206,6 +256,14 @@ export default function ReplanPage() {
                   newVal={latestHistory.newEnergy}
                   unit="单位"
                 />
+                <MetricCompare
+                  label="电梯换乘次数变化"
+                  icon={Building2}
+                  oldVal={latestHistory.oldElevatorCount || 0}
+                  newVal={latestHistory.newElevatorCount || 0}
+                  unit="次"
+                  diff={(latestHistory.newElevatorCount || 0) - (latestHistory.oldElevatorCount || 0)}
+                />
                 <div className="text-center pt-2 border-t border-slate-700/60">
                   <div className="text-xs text-slate-500 mb-1 flex items-center justify-center gap-1">
                     <Zap className="w-3 h-3" /> 新增障碍数量
@@ -233,6 +291,9 @@ export default function ReplanPage() {
                       障碍 +{entry.obstacleCount} | {entry.oldLength}→{entry.newLength} 步
                       {entry.lengthDiff > 0 && <span className="text-red-400"> (+{entry.lengthDiff})</span>}
                       {entry.lengthDiff < 0 && <span className="text-green-400"> ({entry.lengthDiff})</span>}
+                      {entry.newElevatorCount !== undefined && (
+                        <span className="text-yellow-400 ml-1">🛗{entry.oldElevatorCount||0}→{entry.newElevatorCount||0}</span>
+                      )}
                     </span>
                   </div>
                 ))}

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAppStore } from "../store/AppStore";
 import { Panel, StatCard } from "../components/ui";
-import { Settings, ToggleLeft, ToggleRight, Download, FileJson, FileSpreadsheet, RefreshCw, ArrowRight } from "lucide-react";
+import { Settings, ToggleLeft, ToggleRight, Download, FileJson, FileSpreadsheet, RefreshCw, ArrowRight, AlertCircle } from "lucide-react";
 
 const RULE_TYPE_INFO = {
   priority_zone: { name: "优先通行区", color: "text-green-400" },
@@ -22,29 +22,46 @@ const RULE_AREA_DESC = {
 };
 
 export default function RulesExport() {
-  const { rules, updateRules, planRoutes, routes, bestRoute, addLog } = useAppStore();
+  const { rules, updateRules, planRoutes, routes, bestRoute, task, addLog, cargoTypes, priorityLevels } = useAppStore();
   const [beforeRoutes, setBeforeRoutes] = useState(null);
+  const [rulesDirty, setRulesDirty] = useState(false);
+  const debounceRef = useRef(null);
+
+  // Auto-replan with debounce when rules change
+  const triggerAutoReplan = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setRulesDirty(true);
+    debounceRef.current = setTimeout(() => {
+      setBeforeRoutes((prev) => prev || (bestRoute ? routes.map((r) => ({ ...r })) : null));
+      planRoutes();
+      setRulesDirty(false);
+      addLog("规则变更已自动触发路径重规划");
+    }, 600);
+  }, [bestRoute, routes, planRoutes, addLog]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const handleToggle = (id) => {
-    if (!beforeRoutes && bestRoute) {
-      setBeforeRoutes(routes.map((r) => ({ ...r })));
-    }
     const updated = rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r));
     updateRules(updated);
+    triggerAutoReplan();
   };
 
   const handleWeightChange = (id, weight) => {
-    if (!beforeRoutes && bestRoute) {
-      setBeforeRoutes(routes.map((r) => ({ ...r })));
-    }
     const updated = rules.map((r) => (r.id === id ? { ...r, weight: Number(weight) } : r));
     updateRules(updated);
+    triggerAutoReplan();
   };
 
   const handleReplan = () => {
     setBeforeRoutes(routes.map((r) => ({ ...r })));
     planRoutes();
-    addLog("规则变更已触发路径重规划");
+    addLog("手动触发路径重规划");
   };
 
   const handleExportJSON = () => {
@@ -52,9 +69,19 @@ export default function RulesExport() {
       addLog("请先计算路径再导出");
       return;
     }
+    const cargoName = cargoTypes?.find(c => c.id === task.cargo)?.name || task.cargo;
+    const priorityName = priorityLevels?.find(p => p.id === task.priority)?.name || String(task.priority);
+
     const data = {
       timestamp: new Date().toISOString(),
-      task: { start: "1F-药房", end: "2F-消毒供应室" },
+      task: {
+        start: task.start,
+        end: task.end,
+        cargo: task.cargo,
+        cargoName,
+        priority: task.priority,
+        priorityName,
+      },
       bestRoute: {
         strategy: bestRoute.strategy,
         name: bestRoute.name,
@@ -119,16 +146,24 @@ export default function RulesExport() {
         <div>
           <h1 className="text-xl font-bold text-white">规则配置与结果导出</h1>
           <p className="text-slate-500 text-xs mt-1">
-            配置交通规则代价权重（按楼层生效），导出多楼层路径规划结果。
+            配置交通规则代价权重（按楼层生效），导出多楼层路径规划结果。规则变更后自动触发路径重规划。
           </p>
         </div>
-        <button
-          onClick={handleReplan}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-500 text-sm font-medium"
-        >
-          <RefreshCw className="w-4 h-4" />
-          重规划路径
-        </button>
+        <div className="flex items-center gap-3">
+          {rulesDirty && (
+            <div className="flex items-center gap-2 text-amber-400 text-xs">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              正在重规划...
+            </div>
+          )}
+          <button
+            onClick={handleReplan}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-500 text-sm font-medium"
+          >
+            <RefreshCw className="w-4 h-4" />
+            手动重规划
+          </button>
+        </div>
       </div>
 
       {/* Rules Grid */}
