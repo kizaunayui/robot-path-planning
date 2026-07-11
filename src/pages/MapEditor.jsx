@@ -86,7 +86,7 @@ export default function MapEditor() {
 
       {/* All floors overview */}
       <Panel title="各楼层概览">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {['1F', '2F', '3F'].map((fid) => {
             const v = allValidations?.[fid];
             if (!v) return null;

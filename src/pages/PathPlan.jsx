@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
 import { Panel, RouteMetricCard } from "../components/ui";
-import { strategyColors, allPoints, floors } from "../data/mapData";
-import { Play, ArrowRight, Building2, Settings2, Map, BarChart3 } from "lucide-react";
+import { allPoints } from "../data/mapData";
+import { Play, ArrowRight, Building2 } from "lucide-react";
 
 export default function PathPlan() {
   const {
@@ -63,7 +63,7 @@ export default function PathPlan() {
   };
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex flex-col">
+    <div className="flex min-h-0 flex-col lg:h-[calc(100vh-2.5rem)]">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-white">多楼层路径规划</h1>
         <p className="text-slate-500 text-xs mt-1">
@@ -72,10 +72,10 @@ export default function PathPlan() {
       </div>
 
       {/* Three-column layout */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
 
         {/* ===== Left: Control Panel (280px) ===== */}
-        <div className="w-[280px] shrink-0 flex flex-col gap-4 overflow-y-auto">
+        <div className="flex w-full shrink-0 flex-col gap-4 xl:w-[280px] xl:overflow-y-auto">
           <Panel title="规划参数">
             <div className="space-y-4">
               <div>
@@ -140,11 +140,13 @@ export default function PathPlan() {
               </div>
               <button
                 onClick={handlePlan}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded hover:bg-blue-500 transition text-sm font-medium"
+                disabled={!task.start || !task.end || task.start === task.end}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded hover:bg-blue-500 transition text-sm font-medium disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
               >
                 <Play className="w-4 h-4" />
                 开始规划
               </button>
+              {task.start === task.end && <p role="alert" className="text-xs text-amber-400">起点与终点不能相同。</p>}
             </div>
           </Panel>
 
@@ -182,7 +184,7 @@ export default function PathPlan() {
         </div>
 
         {/* ===== Right: Route Comparison (320px) ===== */}
-        <div className="w-[320px] shrink-0 flex flex-col gap-3 overflow-y-auto">
+        <div className="flex w-full shrink-0 flex-col gap-3 xl:w-[320px] xl:overflow-y-auto">
           {routes.length > 0 ? (
             routes.map((route) => (
               <RouteMetricCard

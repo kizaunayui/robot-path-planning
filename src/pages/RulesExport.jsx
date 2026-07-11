@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useAppStore } from "../store/AppStore";
 import { Panel, StatCard } from "../components/ui";
-import { Settings, ToggleLeft, ToggleRight, Download, FileJson, FileSpreadsheet, RefreshCw, ArrowRight, AlertCircle } from "lucide-react";
+import { Settings, ToggleLeft, ToggleRight, Download, FileJson, FileSpreadsheet, RefreshCw, ArrowRight } from "lucide-react";
 
 const RULE_TYPE_INFO = {
   priority_zone: { name: "优先通行区", color: "text-green-400" },
@@ -25,15 +25,16 @@ export default function RulesExport() {
   const { rules, updateRules, planRoutes, routes, bestRoute, task, addLog, cargoTypes, priorityLevels } = useAppStore();
   const [beforeRoutes, setBeforeRoutes] = useState(null);
   const [rulesDirty, setRulesDirty] = useState(false);
+  const [exportStatus, setExportStatus] = useState("");
   const debounceRef = useRef(null);
 
   // Auto-replan with debounce when rules change
-  const triggerAutoReplan = useCallback(() => {
+  const triggerAutoReplan = useCallback((nextRules) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setRulesDirty(true);
     debounceRef.current = setTimeout(() => {
       setBeforeRoutes((prev) => prev || (bestRoute ? routes.map((r) => ({ ...r })) : null));
-      planRoutes();
+      planRoutes(undefined, undefined, nextRules);
       setRulesDirty(false);
       addLog("规则变更已自动触发路径重规划");
     }, 600);
@@ -48,14 +49,14 @@ export default function RulesExport() {
 
   const handleToggle = (id) => {
     const updated = rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r));
-    updateRules(updated);
-    triggerAutoReplan();
+    const nextRules = updateRules(updated);
+    triggerAutoReplan(nextRules);
   };
 
   const handleWeightChange = (id, weight) => {
     const updated = rules.map((r) => (r.id === id ? { ...r, weight: Number(weight) } : r));
-    updateRules(updated);
-    triggerAutoReplan();
+    const nextRules = updateRules(updated);
+    triggerAutoReplan(nextRules);
   };
 
   const handleReplan = () => {
@@ -64,9 +65,24 @@ export default function RulesExport() {
     addLog("手动触发路径重规划");
   };
 
+  const downloadFile = (content, type, filename) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setExportStatus(`${filename} 已生成`);
+  };
+
   const handleExportJSON = () => {
     if (!bestRoute) {
       addLog("请先计算路径再导出");
+      setExportStatus("请先完成一次路径规划，再导出文件。");
       return;
     }
     const cargoName = cargoTypes?.find(c => c.id === task.cargo)?.name || task.cargo;
@@ -107,19 +123,14 @@ export default function RulesExport() {
       })),
       activeRules: rules.filter((r) => r.enabled).map((r) => ({ id: r.id, name: r.name, weight: r.weight, floors: r.floors })),
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pathplan_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(JSON.stringify(data, null, 2), "application/json;charset=utf-8", `pathplan_${Date.now()}.json`);
     addLog("路径数据已导出为 JSON");
   };
 
   const handleExportCSV = () => {
     if (routes.length === 0) {
       addLog("请先计算路径再导出");
+      setExportStatus("请先完成一次路径规划，再导出文件。");
       return;
     }
     const header = "策略,名称,可达,路径长度,转弯次数,电梯换乘,预计耗时,电量消耗,综合评分";
@@ -127,13 +138,7 @@ export default function RulesExport() {
       [r.strategy, r.name, r.reachable ? "是" : "否", r.length, r.turns, r.elevatorCount || 0, r.estimatedMinutes, r.energy, r.score].join(",")
     );
     const csv = [header, ...rows].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pathplan_records_${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile("\uFEFF" + csv, "text/csv;charset=utf-8", `pathplan_records_${Date.now()}.csv`);
     addLog("路径规划记录已导出为 CSV");
   };
 
@@ -182,7 +187,7 @@ export default function RulesExport() {
                   <Settings className={`w-4 h-4 ${info.color}`} />
                   <span className="font-semibold text-slate-200 text-sm">{rule.name}</span>
                 </div>
-                <button onClick={() => handleToggle(rule.id)} className="text-slate-500 hover:text-white">
+                <button aria-label={`${rule.enabled ? "停用" : "启用"}${rule.name}`} onClick={() => handleToggle(rule.id)} className="text-slate-500 hover:text-white">
                   {rule.enabled ? (
                     <ToggleRight className="w-8 h-8 text-green-400" />
                   ) : (
@@ -225,7 +230,7 @@ export default function RulesExport() {
       {/* Before/After comparison */}
       {beforeRoutes && afterBest && beforeBest && (
         <Panel title="规则启用前后路径指标变化">
-          <div className="grid grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
             <div>
               <div className="text-xs text-slate-500 mb-1">路径长度</div>
               <div className="text-lg font-bold text-white">
@@ -264,7 +269,7 @@ export default function RulesExport() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="总规则数" value={rules.length} icon={Settings} color="text-blue-400" />
         <StatCard label="已启用" value={rules.filter((r) => r.enabled).length} icon={ToggleRight} color="text-green-400" />
         <StatCard label="已停用" value={rules.filter((r) => !r.enabled).length} icon={ToggleLeft} color="text-slate-400" />
@@ -276,19 +281,24 @@ export default function RulesExport() {
         <div className="flex gap-3">
           <button
             onClick={handleExportJSON}
-            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded hover:bg-blue-500 text-sm font-medium"
+            disabled={!bestRoute}
+            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded hover:bg-blue-500 text-sm font-medium disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
           >
             <FileJson className="w-4 h-4" />
             导出当前路径 JSON
           </button>
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded hover:bg-emerald-500 text-sm font-medium"
+            disabled={routes.length === 0}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded hover:bg-emerald-500 text-sm font-medium disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
           >
             <FileSpreadsheet className="w-4 h-4" />
             导出路径规划记录 CSV
           </button>
         </div>
+        <p role="status" className={`mt-3 text-xs ${exportStatus.includes("请先") ? "text-amber-400" : "text-emerald-400"}`}>
+          {exportStatus || (bestRoute ? "规划结果已就绪，可以导出。" : "请先完成一次路径规划。")}
+        </p>
       </Panel>
     </div>
   );

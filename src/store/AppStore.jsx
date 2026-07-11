@@ -12,7 +12,6 @@ import {
   planRoutes,
   validateMap,
   validateAllFloors,
-  updateMap as plannerUpdateMap,
   updateFloorMap as plannerUpdateFloorMap,
 } from "../utils/planner";
 
@@ -82,10 +81,11 @@ export function AppStoreProvider({ children }) {
 
   // === 路径规划（多楼层）===
   const doPlanRoutes = useCallback(
-    (taskOverride, paramsOverride) => {
+    (taskOverride, paramsOverride, rulesOverride) => {
       const t = taskOverride || task;
       const p = paramsOverride || params;
-      const result = planRoutes(t, p, floorMap, rules, cargoTypes, priorityLevels);
+      const activeRules = rulesOverride || rules;
+      const result = planRoutes(t, p, floorMap, activeRules, cargoTypes, priorityLevels);
       setRoutes(result.routes);
       setBestRoute(result.bestRoute);
       if (result.bestRoute && result.bestRoute.path?.length > 0 && result.bestRoute.path[0]?.floor) {
@@ -117,16 +117,15 @@ export function AppStoreProvider({ children }) {
   // === 更新规则 ===
   const doUpdateRules = useCallback(
     (incoming) => {
-      setRules((prev) => {
-        const updated = prev.map((r) => {
-          const match = incoming.find((inc) => inc.id === r.id);
-          return match ? { ...r, ...match } : r;
-        });
-        return updated;
+      const updated = rules.map((rule) => {
+        const match = incoming.find((item) => item.id === rule.id);
+        return match ? { ...rule, ...match } : rule;
       });
+      setRules(updated);
       addLog("交通规则已更新");
+      return updated;
     },
-    [addLog]
+    [rules, addLog]
   );
 
   // === 更新参数 ===

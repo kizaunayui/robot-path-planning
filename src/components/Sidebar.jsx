@@ -9,9 +9,9 @@ const navItems = [
   { path: '/rules', icon: Settings, label: '规则配置与导出' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ className = '', onNavigate }) {
   return (
-    <aside className="w-[220px] min-h-screen bg-slate-900 border-r border-slate-700/60 flex flex-col">
+    <aside className={`w-[280px] lg:w-[220px] min-h-screen bg-slate-900 border-r border-slate-700/60 flex flex-col ${className}`}>
       <div className="px-4 py-5 border-b border-slate-700/60">
         <h1 className="text-lg font-bold text-white flex items-center gap-2">
           <Route size={22} className="text-blue-400" />
@@ -27,6 +27,7 @@ export default function Sidebar() {
               key={item.path}
               to={item.path}
               end={item.path === '/'}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   isActive

@@ -4,7 +4,7 @@
  * 支持电梯跨楼层路径规划
  */
 
-import { multiFloorMap, elevatorPosition, elevatorCost, floors } from "../data/mapData";
+import { elevatorPosition, elevatorCost, floors } from "../data/mapData";
 
 // ==================== 工具函数 ====================
 
