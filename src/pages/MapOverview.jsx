@@ -38,7 +38,7 @@ export default function MapOverview() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} color={s.color} />
         ))}
@@ -63,7 +63,7 @@ export default function MapOverview() {
       </Panel>
 
       {/* Floor info cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {floors.map((f) => {
           const fv = allValidations?.[f.id];
           return (
@@ -87,7 +87,7 @@ export default function MapOverview() {
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <button
           onClick={() => navigate("/map-editor")}
           className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded text-sm font-medium transition"

@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
-import { Panel, MetricCompare, LogList } from "../components/ui";
+import { Panel, MetricCompare } from "../components/ui";
 import { Repeat, AlertTriangle, RotateCcw, Clock, Battery, Ruler, Zap, Building2, MapPin } from "lucide-react";
 
 export default function ReplanPage() {
@@ -10,7 +10,6 @@ export default function ReplanPage() {
     replanCount, replanHistory, replan, planRoutes, addLog,
   } = useAppStore();
 
-  const [highlightRoute, setHighlightRoute] = useState(null);
   const [showPrevious, setShowPrevious] = useState(false);
   const [obstacleCount, setObstacleCount] = useState(3);
   const [comparing, setComparing] = useState(false);
@@ -157,7 +156,7 @@ export default function ReplanPage() {
               <div>
                 <div className="text-slate-500 mb-1">新增障碍坐标</div>
                 <div className="text-amber-400 font-mono">
-                  {blockInfo.obstacles.map((o, i) => `(${o[0]}, ${o[1]}`).join('), ')}{')'}
+                  {blockInfo.obstacles.map((o) => `(${o[0]}, ${o[1]})`).join(', ')}
                 </div>
               </div>
               <div>
@@ -196,8 +195,8 @@ export default function ReplanPage() {
       )}
 
       {/* Map + Stats */}
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-8">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-8">
           <Panel
             title="地图视图"
             actions={
@@ -222,7 +221,7 @@ export default function ReplanPage() {
               onFloorChange={setCurrentFloor}
               routes={showPrevious && previousRoute ? [...routes, { ...previousRoute, strategy: "previous" }] : routes}
               bestRoute={bestRoute}
-              highlightRoute={highlightRoute || bestRoute}
+              highlightRoute={bestRoute}
               showLabels={true}
               showFloorTabs={true}
             />
@@ -230,7 +229,7 @@ export default function ReplanPage() {
         </div>
 
         {/* Right side: comparison stats */}
-        <div className="col-span-4 space-y-4">
+        <div className="space-y-4 xl:col-span-4">
           {latestHistory ? (
             <Panel title="重规划统计（最近一次）">
               <div className="space-y-4">

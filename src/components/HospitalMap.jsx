@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { pointColors, pointIcons, strategyColors, elevatorPosition, floorColors, multiFloorMap } from "../data/mapData";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { pointColors, pointIcons, strategyColors, elevatorPosition, floorColors } from "../data/mapData";
 
 /**
  * 多楼层网格地图渲染组件
@@ -11,7 +11,6 @@ export default function HospitalMap({
   currentFloor = '1F',  // 当前楼层
   onFloorChange = null, // 楼层切换回调
   routes = [],
-  bestRoute = null,
   highlightRoute = null,
   robots = [],
   showGrid = true,
@@ -26,18 +25,18 @@ export default function HospitalMap({
   const [hoveredCell, setHoveredCell] = useState(null);
 
   // 使用 floorMap 获取当前楼层数据，或向后兼容使用 mapData
-  const activeMapData = floorMap ? floorMap[currentFloor] : mapData;
-  if (!activeMapData) return null;
+  const activeMapData = (floorMap ? floorMap[currentFloor] : mapData) || null;
+  const hasActiveMap = Boolean(activeMapData);
 
-  const { cols, rows, walls, dynamic, points } = activeMapData;
+  const { cols = 0, rows = 0, walls = [], dynamic = [], points = {} } = activeMapData || {};
 
   // 单元格配置
   const CELL = 36;
   const W = cols * CELL;
   const H = rows * CELL;
 
-  const wallSet = new Set(walls.map((p) => `${p[0]},${p[1]}`));
-  const dynamicSet = new Set(dynamic.map((p) => `${p[0]},${p[1]}`));
+  const wallSet = useMemo(() => new Set(walls.map((p) => `${p[0]},${p[1]}`)), [walls]);
+  const dynamicSet = useMemo(() => new Set(dynamic.map((p) => `${p[0]},${p[1]}`)), [dynamic]);
 
   // 机器人平滑运动位置追踪
   const robotVisualsRef = useRef({});
@@ -425,7 +424,7 @@ export default function HospitalMap({
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [activeMapData, routes, highlightRoute, robots, showGrid, showLabels, showVisited, hoveredCell, editMode, W, H, CELL, cols, rows, wallSet, dynamicSet, currentFloor, getFloorRoutes, getFloorHighlight, getZones]);
+  }, [activeMapData, routes, highlightRoute, robots, showGrid, showLabels, showVisited, hoveredCell, editMode, W, H, CELL, cols, rows, walls, dynamic, points, wallSet, dynamicSet, currentFloor, getFloorRoutes, getFloorHighlight, getZones]);
 
   // 鼠标交互
   const getCell = useCallback(
@@ -466,6 +465,10 @@ export default function HospitalMap({
   );
 
   const isElevatorCell = hoveredCell && hoveredCell[0] === elevatorPosition[0] && hoveredCell[1] === elevatorPosition[1];
+
+  if (!hasActiveMap) {
+    return <div className={`rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500 ${className}`}>当前楼层地图数据不可用</div>;
+  }
 
   return (
     <div className={className}>
