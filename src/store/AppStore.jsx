@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import {
   defaultMapData,
   multiFloorMap,
@@ -17,6 +17,39 @@ import {
 
 const AppStoreContext = createContext(null);
 
+// 地图存档带版本号：数据结构变更时递增版本，旧存档自动作废，避免读到不兼容数据
+const FLOORMAP_STORAGE_KEY = "pathplan_floormap_v2";
+const FLOORMAP_VERSION = 2;
+const LEGACY_STORAGE_KEYS = ["pathplan_floormap", "pathplan_map"];
+
+function isValidFloorMap(data) {
+  if (!data || typeof data !== "object") return false;
+  return Object.keys(multiFloorMap).every((floorId) => {
+    const m = data[floorId];
+    return (
+      m &&
+      Number.isInteger(m.cols) &&
+      Number.isInteger(m.rows) &&
+      Array.isArray(m.walls) &&
+      Array.isArray(m.dynamic) &&
+      m.points &&
+      typeof m.points === "object"
+    );
+  });
+}
+
+function loadSavedFloorMap() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FLOORMAP_STORAGE_KEY) ?? "null");
+    if (saved && saved.version === FLOORMAP_VERSION && isValidFloorMap(saved.data)) {
+      return saved.data;
+    }
+  } catch {
+    /* 存档损坏则回退默认地图 */
+  }
+  return null;
+}
+
 function addLogEntry(logs, message) {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
@@ -25,13 +58,9 @@ function addLogEntry(logs, message) {
 
 export function AppStoreProvider({ children }) {
   // === 多楼层地图 ===
-  const [floorMap, setFloorMap] = useState(() => {
-    const saved = localStorage.getItem("pathplan_floormap");
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    return JSON.parse(JSON.stringify(multiFloorMap));
-  });
+  const [floorMap, setFloorMap] = useState(
+    () => loadSavedFloorMap() || JSON.parse(JSON.stringify(multiFloorMap))
+  );
 
   // === 当前楼层 ===
   const [currentFloor, setCurrentFloor] = useState('1F');
@@ -69,14 +98,17 @@ export function AppStoreProvider({ children }) {
     setLogs((prev) => addLogEntry(prev, msg));
   }, []);
 
-  // === 地图验证 ===
-  const validation = validateMap(map);
-  const allValidations = validateAllFloors(floorMap);
+  // === 地图验证（BFS 连通性检查，仅在地图变化时重算）===
+  const allValidations = useMemo(() => validateAllFloors(floorMap), [floorMap]);
+  const validation = useMemo(() => validateMap(map), [map]);
 
   // === 保存楼层地图 ===
   const saveFloorMap = useCallback((newFloorMap) => {
     setFloorMap(newFloorMap);
-    localStorage.setItem("pathplan_floormap", JSON.stringify(newFloorMap));
+    localStorage.setItem(
+      FLOORMAP_STORAGE_KEY,
+      JSON.stringify({ version: FLOORMAP_VERSION, data: newFloorMap })
+    );
   }, []);
 
   // === 路径规划（多楼层）===
@@ -196,8 +228,8 @@ export function AppStoreProvider({ children }) {
     setReplanHistory([]);
     setPreviousRoute(null);
     setCurrentFloor('1F');
-    localStorage.removeItem("pathplan_floormap");
-    localStorage.removeItem("pathplan_map");
+    localStorage.removeItem(FLOORMAP_STORAGE_KEY);
+    LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
     addLog("恢复默认地图和规则");
   }, [addLog]);
 

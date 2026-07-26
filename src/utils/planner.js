@@ -4,38 +4,53 @@
  * 支持电梯跨楼层路径规划
  */
 
-import { elevatorPosition, elevatorCost, floors } from "../data/mapData";
+import { elevatorPosition, elevatorCost, floors, inZone, defaultParams } from "../data/mapData";
 
 // ==================== 工具函数 ====================
+
+// 单步代价下限。启发函数按此下限缩放，保证不高估实际代价（可采纳），
+// 因此即使规则折扣把单步代价压低，A* 仍能给出最优路径。
+const MIN_STEP_COST = 0.5;
 
 function heuristic(startState, goalState) {
   // 同层曼哈顿距离 + 跨层代价
   const dx = Math.abs(startState.pos[0] - goalState.pos[0]);
   const dy = Math.abs(startState.pos[1] - goalState.pos[1]);
   const floorDiff = startState.floor !== goalState.floor ? elevatorCost : 0;
-  return dx + dy + floorDiff;
+  return (dx + dy + floorDiff) * MIN_STEP_COST;
 }
 
 function stateKey(state) {
   return `${state.floor},${state.pos[0]},${state.pos[1]}`;
 }
 
-function neighbors(state, floorMap) {
+// 每层的墙壁/动态障碍集合，整次搜索只构建一次
+function buildFloorContext(floorMap) {
+  const ctx = {};
+  for (const [floorId, mapData] of Object.entries(floorMap)) {
+    ctx[floorId] = {
+      cols: mapData.cols,
+      rows: mapData.rows,
+      walls: new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`)),
+      dynamic: new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`)),
+    };
+  }
+  return ctx;
+}
+
+function neighbors(state, floorCtx) {
   const { floor, pos } = state;
   const [x, y] = pos;
-  const mapData = floorMap[floor];
-  if (!mapData) return [];
-
-  const walls = new Set(mapData.walls.map((p) => `${p[0]},${p[1]}`));
-  const dynamic = new Set(mapData.dynamic.map((p) => `${p[0]},${p[1]}`));
-  const blocked = new Set([...walls, ...dynamic]);
+  const ctx = floorCtx[floor];
+  if (!ctx) return [];
 
   const cells = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
   const result = [];
 
   // 同层普通移动
   for (const [nx, ny] of cells) {
-    if (nx >= 0 && nx < mapData.cols && ny >= 0 && ny < mapData.rows && !blocked.has(`${nx},${ny}`)) {
+    const key = `${nx},${ny}`;
+    if (nx >= 0 && nx < ctx.cols && ny >= 0 && ny < ctx.rows && !ctx.walls.has(key) && !ctx.dynamic.has(key)) {
       result.push({ floor, pos: [nx, ny], isElevator: false });
     }
   }
@@ -43,17 +58,12 @@ function neighbors(state, floorMap) {
   // 电梯跨层移动：当前在电梯位置时可切换楼层
   const [ex, ey] = elevatorPosition;
   if (x === ex && y === ey) {
+    const elevKey = `${ex},${ey}`;
     for (const f of floors) {
-      if (f.id !== floor) {
-        // 检查目标楼层电梯位置是否可通行
-        const targetMap = floorMap[f.id];
-        if (targetMap) {
-          const targetWalls = new Set(targetMap.walls.map((p) => `${p[0]},${p[1]}`));
-          const targetDynamic = new Set(targetMap.dynamic.map((p) => `${p[0]},${p[1]}`));
-          if (!targetWalls.has(`${ex},${ey}`) && !targetDynamic.has(`${ex},${ey}`)) {
-            result.push({ floor: f.id, pos: [ex, ey], isElevator: true });
-          }
-        }
+      if (f.id === floor) continue;
+      const targetCtx = floorCtx[f.id];
+      if (targetCtx && !targetCtx.walls.has(elevKey) && !targetCtx.dynamic.has(elevKey)) {
+        result.push({ floor: f.id, pos: [ex, ey], isElevator: true });
       }
     }
   }
@@ -74,82 +84,87 @@ function rebuildPath(parent, endKey) {
 
 // ==================== 移动代价 ====================
 
-export function moveCost(fromState, toState, prevState, strategy, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
-  let cost = 1.0;
-
-  // 电梯跨层代价
+// 代价模型：基础代价 1.0 + 附加惩罚（规则/转弯/障碍规避），再乘折扣。
+// 货物与优先级乘数只缩放附加惩罚——均匀缩放全部代价不会改变最短路径的选择，
+// 只缩放惩罚项才能产生真实差异：紧急任务（乘数<1）更敢于穿越受限区，低优先级任务绕行更保守。
+export function moveCost(fromState, toState, prevState, strategy, rules, cargoMultiplier = 1, priorityMultiplier = 1, params = defaultParams, floorCtx = null) {
+  // 电梯跨层：固定代价，不叠加区域/转弯惩罚
   if (toState.isElevator) {
-    cost = elevatorCost;
+    return elevatorCost;
   }
 
+  let extra = 0;
+  let discount = 1.0;
+
   // smooth 策略：转弯惩罚（同层内）
-  if (strategy === "smooth" && prevState && !toState.isElevator) {
+  if (strategy === "smooth" && prevState && fromState.floor === prevState.floor) {
     const oldDir = [fromState.pos[0] - prevState.pos[0], fromState.pos[1] - prevState.pos[1]];
     const newDir = [toState.pos[0] - fromState.pos[0], toState.pos[1] - fromState.pos[1]];
     if (oldDir[0] !== newDir[0] || oldDir[1] !== newDir[1]) {
-      cost += 0.8;
+      extra += 0.8;
     }
   }
 
   // energy 策略：基础能耗
   if (strategy === "energy") {
-    cost += 0.15;
+    extra += 0.15;
   }
 
-  // 货物类型和优先级影响
-  cost *= cargoMultiplier;
-  cost *= priorityMultiplier;
+  // 规划参数：动态障碍规避灵敏度 / 墙体安全缓冲
+  if (floorCtx) {
+    const [x, y] = toState.pos;
+    const sensitivity = params?.sensitivity ?? 0;
+    const buffer = params?.buffer ?? 0;
+    if (sensitivity > 0 || buffer > 0) {
+      for (const [ax, ay] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        const key = `${ax},${ay}`;
+        if (sensitivity > 0 && floorCtx.dynamic.has(key)) extra += sensitivity * 0.3;
+        if (buffer > 0 && floorCtx.walls.has(key)) extra += buffer * 0.15;
+      }
+    }
+  }
 
-  // 规则影响（按楼层过滤）
-  const currentFloor = toState.floor;
+  // 规则影响（按楼层过滤，区域坐标来自规则数据）
+  const [nx, ny] = toState.pos;
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    // 规则楼层过滤
-    if (rule.floors && !rule.floors.includes(currentFloor)) continue;
+    if (rule.floors && !rule.floors.includes(toState.floor)) continue;
 
-    const [nx, ny] = toState.pos;
+    const zoneHit = rule.zone ? inZone(rule.zone, nx, ny) : false;
 
-    // 污染区避让 (R2) - 1F [18-22, 7-11]
-    if (rule.type === "avoid_zone" && nx >= 18 && nx <= 22 && ny >= 7 && ny <= 11) {
-      cost += rule.weight;
-    }
-
-    // 手术区优先通行 (R1) - 2F [23-27, 2-6]
-    if (rule.type === "priority_zone" && nx >= 23 && nx <= 27 && ny >= 2 && ny <= 6) {
-      cost *= 0.85;
-    }
-
-    // 平稳优先 (R3)
-    if (rule.type === "smooth" && strategy === "smooth") {
-      cost *= 0.95;
-    }
-
-    // 低电量节能 (R4)
-    if (rule.type === "energy" && strategy === "energy") {
-      cost *= 0.92;
-    }
-
-    // 禁行区 (R5) - 1F 电梯厅周围 [12-16, 8-12]
-    if (rule.type === "no_go" && nx >= 12 && nx <= 16 && ny >= 8 && ny <= 12) {
-      cost += rule.weight;
-    }
-
-    // 限速区 (R6) - 3F 住院区走廊 [2-6, 14-18]
-    if (rule.type === "speed_limit" && nx >= 2 && nx <= 6 && ny >= 14 && ny <= 18) {
-      cost *= rule.weight;
+    switch (rule.type) {
+      case "avoid_zone": // 污染区避让 (R2)
+      case "no_go":      // 禁行区 (R5)
+        if (zoneHit) extra += rule.weight;
+        break;
+      case "speed_limit": // 限速区 (R6)：附加惩罚 = 权重-1，权重≤1 时不产生"捷径"
+        if (zoneHit) extra += Math.max(0, rule.weight - 1);
+        break;
+      case "priority_zone": // 手术区优先通行 (R1)
+        if (zoneHit) discount *= 0.85;
+        break;
+      case "smooth": // 平稳优先 (R3)
+        if (strategy === "smooth") discount *= 0.95;
+        break;
+      case "energy": // 低电量节能 (R4)
+        if (strategy === "energy") discount *= 0.92;
+        break;
     }
   }
 
-  return cost;
+  extra *= cargoMultiplier * priorityMultiplier;
+
+  return Math.max(MIN_STEP_COST, (1.0 + extra) * discount);
 }
 
 // ==================== 多楼层 A* 搜索 ====================
 
-export function astar(start, goal, strategy, floorMap, rules, cargoMultiplier = 1, priorityMultiplier = 1) {
+export function astar(start, goal, strategy, floorMap, rules, cargoMultiplier = 1, priorityMultiplier = 1, params = defaultParams) {
   // start = {floor: '1F', pos: [x, y]}
   // goal = {floor: '3F', pos: [x, y]}
   // floorMap = multiFloorMap
 
+  const floorCtx = buildFloorContext(floorMap);
   const startKey = stateKey(start);
   const goalKey = stateKey(goal);
 
@@ -177,10 +192,10 @@ export function astar(start, goal, strategy, floorMap, rules, cargoMultiplier = 
       return { path: rebuildPath(parent, goalKey), visited };
     }
 
-    for (const nxt of neighbors(state, floorMap)) {
+    for (const nxt of neighbors(state, floorCtx)) {
       const nxtKey = stateKey(nxt);
       const prevState = current.prevKey ? parseState(current.prevKey) : null;
-      const ng = g + moveCost(state, nxt, prevState, strategy, rules, cargoMultiplier, priorityMultiplier);
+      const ng = g + moveCost(state, nxt, prevState, strategy, rules, cargoMultiplier, priorityMultiplier, params, floorCtx[nxt.floor]);
       if (ng < (best[nxtKey] ?? 999999)) {
         best[nxtKey] = ng;
         openSet.push({
@@ -205,19 +220,21 @@ function parseState(key) {
 // ==================== 路径报告 ====================
 
 export function routeReport(strategy, path, visited) {
-  let turns = 0;
+  // 电梯换乘：每个相邻楼层变化恰好计一次（覆盖首步和末步）
   let elevatorCount = 0;
+  for (let i = 1; i < path.length; i++) {
+    if (path[i - 1].floor !== path[i].floor) elevatorCount++;
+  }
 
+  // 转弯：仅统计同层内连续三点的方向变化
+  let turns = 0;
   for (let i = 2; i < path.length; i++) {
     const a = path[i - 2];
     const b = path[i - 1];
     const c = path[i];
 
     // 跨楼层不计入转弯
-    if (b.floor !== c.floor || a.floor !== b.floor) {
-      if (b.floor !== c.floor) elevatorCount++;
-      continue;
-    }
+    if (b.floor !== c.floor || a.floor !== b.floor) continue;
 
     const oldDir = [b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]];
     const newDir = [c.pos[0] - b.pos[0], c.pos[1] - b.pos[1]];
@@ -226,15 +243,9 @@ export function routeReport(strategy, path, visited) {
     }
   }
 
-  // 检查最后一段跨层
-  if (path.length >= 2) {
-    const last = path[path.length - 1];
-    const prev = path[path.length - 2];
-    if (last.floor !== prev.floor) elevatorCount++;
-  }
-
+  // 综合评分只由路径本身的质量构成（长度/转弯/换乘），与搜索过程无关
   const totalSteps = path.length > 0 ? path.length - 1 : 0;
-  const score = totalSteps > 0 ? totalSteps + turns * 0.8 + visited.size * 0.02 : 999999;
+  const score = totalSteps > 0 ? totalSteps + turns * 0.8 + elevatorCount * elevatorCost : 999999;
 
   const names = {
     time: "最优路径A-时间优先",
@@ -301,7 +312,7 @@ export function planRoutes(task, params, floorMap, rules, cargoTypes, priorityLe
 
   const routes = [];
   for (const strategy of ["time", "smooth", "energy"]) {
-    const { path, visited } = astar(startState, goalState, strategy, floorMap, rules, cargoMultiplier, priorityMultiplier);
+    const { path, visited } = astar(startState, goalState, strategy, floorMap, rules, cargoMultiplier, priorityMultiplier, params);
     routes.push(routeReport(strategy, path, visited));
   }
 

@@ -127,16 +127,28 @@ export default function PathPlan() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">灵敏度</label>
+                <label className="text-xs text-slate-500 mb-1 block">动态障碍规避灵敏度</label>
                 <input
                   type="range"
-                  min={1}
+                  min={0}
                   max={5}
                   value={params.sensitivity}
                   onChange={(e) => updateParams({ sensitivity: Number(e.target.value) })}
                   className="w-full accent-blue-500"
                 />
-                <div className="text-xs text-center text-slate-500">{params.sensitivity}</div>
+                <div className="text-xs text-center text-slate-500">{params.sensitivity} — 越高路径越远离动态障碍</div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">墙体安全缓冲</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={3}
+                  value={params.buffer}
+                  onChange={(e) => updateParams({ buffer: Number(e.target.value) })}
+                  className="w-full accent-blue-500"
+                />
+                <div className="text-xs text-center text-slate-500">{params.buffer} — 越高路径越倾向远离墙壁</div>
               </div>
               <button
                 onClick={handlePlan}
@@ -177,6 +189,7 @@ export default function PathPlan() {
               routes={routes}
               bestRoute={bestRoute}
               highlightRoute={highlightRoute}
+              rules={rules}
               showVisited={true}
               showFloorTabs={true}
             />

@@ -2,12 +2,13 @@ import { useState, useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import HospitalMap from "../components/HospitalMap";
 import { Panel, MetricCompare } from "../components/ui";
+import { elevatorPosition } from "../data/mapData";
 import { Repeat, AlertTriangle, RotateCcw, Clock, Battery, Ruler, Zap, Building2, MapPin } from "lucide-react";
 
 export default function ReplanPage() {
   const {
     floorMap, currentFloor, setCurrentFloor, routes, bestRoute, previousRoute,
-    replanCount, replanHistory, replan, planRoutes, addLog,
+    replanCount, replanHistory, replan, planRoutes, addLog, rules,
   } = useAppStore();
 
   const [showPrevious, setShowPrevious] = useState(false);
@@ -29,19 +30,22 @@ export default function ReplanPage() {
       addLog("当前楼层路径太短，无法生成障碍");
       return { obstacles: [], blockedNodes: [] };
     }
-    const obstacles = [];
-    const blockedNodes = [];
+    // 候选点取路径中段（避开起终点附近），并排除电梯格——堵死电梯会切断所有跨层通路
     const startIdx = Math.floor(floorNodes.length * 0.2);
     const endIdx = Math.floor(floorNodes.length * 0.8);
-    const used = new Set();
-    for (let i = 0; i < obstacleCount && i < (endIdx - startIdx); i++) {
-      let idx;
-      do {
-        idx = startIdx + Math.floor(Math.random() * (endIdx - startIdx));
-      } while (used.has(idx));
-      used.add(idx);
-      const node = floorNodes[idx];
-      const pos = node.pos || node;
+    const [ex, ey] = elevatorPosition;
+    const candidates = [];
+    for (let i = startIdx; i < endIdx; i++) {
+      const pos = floorNodes[i].pos || floorNodes[i];
+      if (pos[0] === ex && pos[1] === ey) continue;
+      candidates.push(pos);
+    }
+
+    const obstacles = [];
+    const blockedNodes = [];
+    for (let i = 0; i < obstacleCount && candidates.length > 0; i++) {
+      const k = Math.floor(Math.random() * candidates.length);
+      const pos = candidates.splice(k, 1)[0];
       obstacles.push(pos);
       blockedNodes.push({ floor: currentFloor, pos });
     }
@@ -222,6 +226,7 @@ export default function ReplanPage() {
               routes={showPrevious && previousRoute ? [...routes, { ...previousRoute, strategy: "previous" }] : routes}
               bestRoute={bestRoute}
               highlightRoute={bestRoute}
+              rules={rules}
               showLabels={true}
               showFloorTabs={true}
             />

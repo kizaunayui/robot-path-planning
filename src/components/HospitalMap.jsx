@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { pointColors, pointIcons, strategyColors, elevatorPosition, floorColors } from "../data/mapData";
+import { pointColors, pointIcons, strategyColors, elevatorPosition, ruleZoneStyles } from "../data/mapData";
+import FloorTabs from "./ui/FloorTabs";
 
 /**
  * 多楼层网格地图渲染组件
@@ -13,6 +14,7 @@ export default function HospitalMap({
   routes = [],
   highlightRoute = null,
   robots = [],
+  rules = [],           // 交通规则：启用且带 zone 的规则会在地图上绘制区域覆盖层
   showGrid = true,
   showLabels = true,
   showVisited = false,
@@ -65,43 +67,21 @@ export default function HospitalMap({
     return highlightRoute;
   }, [highlightRoute, currentFloor]);
 
-  // 规则区域定义
+  // 规则区域覆盖层：由启用中的规则数据驱动，与实际代价计算保持一致
   const getZones = useCallback(() => {
-    if (currentFloor === '1F') {
-      return [
-        {
-          name: "污染避让区",
-          x: 18, y: 7, w: 5, h: 5,
-          color: "rgba(239, 68, 68, 0.15)",
-          borderColor: "rgba(239, 68, 68, 0.6)",
-          textColor: "#f87171",
-        },
-      ];
-    }
-    if (currentFloor === '2F') {
-      return [
-        {
-          name: "手术优先区",
-          x: 23, y: 2, w: 5, h: 5,
-          color: "rgba(16, 185, 129, 0.15)",
-          borderColor: "rgba(16, 185, 129, 0.6)",
-          textColor: "#34d399",
-        },
-      ];
-    }
-    if (currentFloor === '3F') {
-      return [
-        {
-          name: "限速区",
-          x: 2, y: 14, w: 5, h: 5,
-          color: "rgba(245, 158, 11, 0.15)",
-          borderColor: "rgba(245, 158, 11, 0.6)",
-          textColor: "#fbbf24",
-        },
-      ];
-    }
-    return [];
-  }, [currentFloor]);
+    return rules
+      .filter((r) => r.enabled && r.zone && (!r.floors || r.floors.includes(currentFloor)))
+      .map((r) => {
+        const style = ruleZoneStyles[r.type] || ruleZoneStyles.avoid_zone;
+        return {
+          name: r.name,
+          x: r.zone.x, y: r.zone.y, w: r.zone.w, h: r.zone.h,
+          color: style.fill,
+          borderColor: style.border,
+          textColor: style.text,
+        };
+      });
+  }, [rules, currentFloor]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -474,22 +454,7 @@ export default function HospitalMap({
     <div className={className}>
       {/* 楼层切换 Tab */}
       {showFloorTabs && onFloorChange && (
-        <div className="flex gap-2 mb-3">
-          {['1F', '2F', '3F'].map((fid) => (
-            <button
-              key={fid}
-              onClick={() => onFloorChange(fid)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                currentFloor === fid
-                  ? 'text-white shadow-lg'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-              style={currentFloor === fid ? { backgroundColor: floorColors[fid] } : {}}
-            >
-              {fid} {fid === '1F' ? '一层' : fid === '2F' ? '二层' : '三层'}
-            </button>
-          ))}
-        </div>
+        <FloorTabs currentFloor={currentFloor} onFloorChange={onFloorChange} className="mb-3" />
       )}
 
       <canvas

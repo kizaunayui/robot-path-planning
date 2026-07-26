@@ -12,14 +12,19 @@ const RULE_TYPE_INFO = {
   speed_limit: { name: "限速区域", color: "text-orange-400" },
 };
 
-const RULE_AREA_DESC = {
-  avoid_zone: "影响区域: 1F [18-22, 7-11] 污染区",
-  priority_zone: "影响区域: 2F [23-27, 2-6] 手术区",
-  smooth: "全局平稳策略折扣（所有楼层）",
-  energy: "全局节能策略折扣（所有楼层）",
-  no_go: "影响区域: 1F [12-16, 8-12] 电梯厅周围",
-  speed_limit: "影响区域: 3F [2-6, 14-18] 住院区走廊",
-};
+// 区域描述直接由规则数据生成，与代价计算、地图渲染共用同一坐标来源
+function ruleAreaDesc(rule) {
+  if (!rule.zone) return "策略折扣，作用于全部楼层";
+  const { x, y, w, h } = rule.zone;
+  return `影响区域: ${(rule.floors || []).join("/")} [${x}-${x + w - 1}, ${y}-${y + h - 1}]`;
+}
+
+// 权重下限：限速区权重是"倍率"语义，低于 1 会让限速区反而变成低代价捷径
+function ruleWeightRange(rule) {
+  if (rule.type === "no_go") return { min: 1, max: 99 };
+  if (rule.type === "speed_limit") return { min: 1, max: 3 };
+  return { min: 0.5, max: 3 };
+}
 
 export default function RulesExport() {
   const { rules, updateRules, planRoutes, routes, bestRoute, task, addLog, cargoTypes, priorityLevels } = useAppStore();
@@ -142,7 +147,9 @@ export default function RulesExport() {
     addLog("路径规划记录已导出为 CSV");
   };
 
-  const beforeBest = beforeRoutes?.find((r) => r.reachable);
+  const beforeBest = beforeRoutes
+    ?.filter((r) => r.reachable)
+    .reduce((a, b) => (a.score < b.score ? a : b), beforeRoutes.find((r) => r.reachable) || null);
   const afterBest = bestRoute;
 
   return (
@@ -204,8 +211,8 @@ export default function RulesExport() {
                   <span>权重:</span>
                   <input
                     type="range"
-                    min={0.5}
-                    max={rule.type === "no_go" ? 99 : 3}
+                    min={ruleWeightRange(rule).min}
+                    max={ruleWeightRange(rule).max}
                     step={0.1}
                     value={rule.weight}
                     onChange={(e) => handleWeightChange(rule.id, e.target.value)}
@@ -214,7 +221,7 @@ export default function RulesExport() {
                   <span className="font-mono w-10 text-right text-slate-300">{rule.weight}</span>
                 </div>
                 <div className="text-slate-600">
-                  {RULE_AREA_DESC[rule.type]}
+                  {ruleAreaDesc(rule)}
                 </div>
               </div>
               <div className="mt-2">

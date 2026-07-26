@@ -130,18 +130,34 @@ export const defaultMapData = {
 };
 
 // 默认规则（6条）
+// zone: 规则生效的矩形区域（网格坐标，含 x..x+w-1, y..y+h-1），
+// 代价计算、地图渲染、规则页描述都以这里为唯一数据源
 export const defaultRules = [
-  { id: "R1", name: "手术区优先通行", type: "priority_zone", enabled: true, weight: 1.3, floors: ["2F"] },
-  { id: "R2", name: "污染区避让", type: "avoid_zone", enabled: true, weight: 2.0, floors: ["1F"] },
+  { id: "R1", name: "手术区优先通行", type: "priority_zone", enabled: true, weight: 1.3, floors: ["2F"], zone: { x: 23, y: 2, w: 5, h: 5 } },
+  { id: "R2", name: "污染区避让", type: "avoid_zone", enabled: true, weight: 2.0, floors: ["1F"], zone: { x: 18, y: 7, w: 5, h: 5 } },
   { id: "R3", name: "平稳优先", type: "smooth", enabled: true, weight: 1.2, floors: ["1F", "2F", "3F"] },
   { id: "R4", name: "低电量节能", type: "energy", enabled: true, weight: 1.1, floors: ["1F", "2F", "3F"] },
-  { id: "R5", name: "禁行区", type: "no_go", enabled: false, weight: 99, floors: ["1F"] },
-  { id: "R6", name: "限速区", type: "speed_limit", enabled: false, weight: 1.8, floors: ["3F"] },
+  { id: "R5", name: "禁行区", type: "no_go", enabled: false, weight: 99, floors: ["1F"], zone: { x: 12, y: 8, w: 5, h: 5 } },
+  { id: "R6", name: "限速区", type: "speed_limit", enabled: false, weight: 1.8, floors: ["3F"], zone: { x: 2, y: 14, w: 5, h: 5 } },
 ];
 
+// 判断网格坐标是否落在规则区域内
+export function inZone(zone, x, y) {
+  return x >= zone.x && x < zone.x + zone.w && y >= zone.y && y < zone.y + zone.h;
+}
+
+// 规则区域在地图上的展示样式（按规则类型）
+export const ruleZoneStyles = {
+  avoid_zone: { fill: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.6)", text: "#f87171" },
+  priority_zone: { fill: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.6)", text: "#34d399" },
+  no_go: { fill: "rgba(239, 68, 68, 0.3)", border: "rgba(248, 113, 113, 0.9)", text: "#fca5a5" },
+  speed_limit: { fill: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.6)", text: "#fbbf24" },
+};
+
 // 默认参数
+// sensitivity: 动态障碍规避灵敏度（0-5），越高路径离动态障碍越远
+// buffer: 墙体安全缓冲（0-3），越高路径越倾向远离墙壁
 export const defaultParams = {
-  strategy: "time",
   sensitivity: 2,
   buffer: 1,
 };

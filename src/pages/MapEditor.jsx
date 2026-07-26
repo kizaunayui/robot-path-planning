@@ -11,7 +11,7 @@ const TOOLS = [
 ];
 
 export default function MapEditor() {
-  const { floorMap, currentFloor, setCurrentFloor, updateMap, allValidations, resetState } = useAppStore();
+  const { floorMap, currentFloor, setCurrentFloor, updateMap, allValidations, resetState, rules } = useAppStore();
   const [tool, setTool] = useState("wall");
 
   const handleCellClick = useCallback(
@@ -60,6 +60,7 @@ export default function MapEditor() {
           onFloorChange={setCurrentFloor}
           editMode={tool}
           onCellClick={handleCellClick}
+          rules={rules}
           showLabels={true}
           showGrid={true}
           showFloorTabs={true}

@@ -8,7 +8,7 @@ import { floors } from "../data/mapData";
 export default function MapOverview() {
   const {
     floorMap, currentFloor, setCurrentFloor, routes, bestRoute,
-    allValidations, logs, replanCount, task,
+    allValidations, logs, replanCount, task, rules,
   } = useAppStore();
   const navigate = useNavigate();
 
@@ -57,6 +57,7 @@ export default function MapOverview() {
           routes={routes}
           bestRoute={bestRoute}
           highlightRoute={bestRoute}
+          rules={rules}
           showLabels={true}
           showFloorTabs={true}
         />
